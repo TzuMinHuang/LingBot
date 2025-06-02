@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" >
+    <meta name="description" content="JavaScript Chatbot with WebSocket and modern UI">
+    <title>chatbot in javascript</title>
+
+    <link rel="stylesheet" href="./css/style.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+
+    <script type="module" src="./js/Websocket.js"></script>
+    <script type="module" src="./js/ChatUI.js"></script>
+    <script type="module" src="./js/ChatService.js"></script>
+    <script type="module" src="./js/EventBus.js"></script>
+    <script type="module" src="./js/ChatApp.js"></script>
+    <script type="module" src="./js/App.js"></script>
+</head>
+<body >
+    <!-- Chatbot Toggle Button -->
+  <button class="chatbot-toggler">
+    <span class="material-symbols-outlined">mode_comment</span>
+    <span class="material-symbols-outlined">close</span>
+  </button>
+
+  <!-- Chatbot Window -->
+  <div class="chatbot">
+    <header>
+      <h2>Chatbot</h2>
+      <span class="chatbot-close-btn material-symbols-outlined">close</span>
+    </header>
+
+    <ul class="chatbox"></ul>
+
+    <div class="chat-input">
+      <textarea required placeholder="Enter a message..."></textarea>
+      <span id="send-btn" class="material-symbols-outlined">send</span>
+    </div>
+  </div>
+
+</body>
+</html>

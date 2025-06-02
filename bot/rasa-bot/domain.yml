@@ -1,0 +1,77 @@
+version: "3.1"
+
+intents:
+  - faq_member
+  - faq_shopping
+  - faq_payment
+  - faq_return
+  - faq_invoice
+  - query_order
+  - place_order
+  - transfer_to_human
+  - cancel_transfer
+  - greet
+  - goodbye
+  - fallback
+  - help_customer
+
+entities:
+  - order_id
+  - product_name
+
+slots:
+  order_id:
+    type: text
+    mappings:
+      - type: from_entity
+        entity: order_id
+  product_name:
+    type: text
+    mappings:
+      - type: from_entity
+        entity: product_name
+
+responses:
+  utter_faq_member:
+    - text: "您可以點選網站右上角的「會員/註冊」，使用手機號碼或其他方式登入成為會員。"
+
+  utter_faq_shopping:
+    - text: "您可以在網站中選擇商品並加入購物車，然後前往結帳頁面完成購物流程。"
+
+  utter_faq_payment:
+    - text: "我們接受信用卡、PayPal 及其他付款方式。付款過程中若有任何問題，請聯絡客服。"
+
+  utter_faq_return:
+    - text: "退貨請參照我們的退貨政策，並提供訂單編號及商品資訊。"
+
+  utter_faq_invoice:
+    - text: "發票可以在結帳時申請，若您遺失發票，可聯繫我們重新開立。"
+
+  utter_query_order:
+    - text: "請提供您的訂單編號，我來幫您查詢訂單狀態。"
+
+  utter_place_order:
+    - text: "請告訴我您要訂購的商品，我將協助您完成訂單。"
+
+  utter_transfer_to_human:
+    - text: "轉接給客服中，請稍候。"
+
+  utter_cancel_transfer:
+    - text: "已取消轉接，若有其他問題，請告訴我。"
+
+  utter_greet:
+    - text: "你好！有什麼我可以幫忙的嗎？"
+
+  utter_goodbye:
+    - text: "再見！祝你有美好的一天。"
+
+  utter_fallback:
+    - text: "抱歉，我無法理解您的問題。可以再說明一下嗎？"
+
+response_selector:
+  faq:
+    use_tokens: true
+    retrieval_intent: faq
+    scale_loss: true
+
+actions: []

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>簡易客服後台</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    .container { display: flex; height: 100vh; }
+    .queue { width: 30%; background: #f5f5f5; padding: 1em; overflow-y: auto; border-right: 1px solid #ccc; }
+    .chat { flex: 1; display: flex; flex-direction: column; padding: 1em; }
+    .customer { background: white; padding: 0.5em; margin-bottom: 0.5em; border: 1px solid #ccc; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+    .chat-box { flex: 1; border: 1px solid #ccc; padding: 1em; margin-bottom: 1em; overflow-y: auto; background: #fff; }
+    .message { margin: 0.5em 0; }
+    .me { text-align: right; color: blue; }
+    .customer-msg { color: green; }
+    .input-area { display: flex; gap: 0.5em; }
+    input[type="text"] { flex: 1; padding: 0.5em; }
+    button { padding: 0.5em 1em; }
+    .active-chat { background-color: #d9f7be; }
+    .active-customer-list { margin-top: 1em; }
+    .active-customer { background: #f0f8ff; padding: 0.5em; margin-bottom: 0.5em; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="queue" id="queue">
+      <h3>排隊中客戶</h3>
+    </div>
+
+    <div class="chat">
+      <h3 id="chatTitle">請選擇一位客戶</h3>
+      <div class="chat-box" id="chatBox">
+      </div>
+      <div class="input-area">
+        <input type="text" id="messageInput" placeholder="輸入訊息..." />
+        <button onclick="sendMessage()">送出</button>
+        <button onclick="endChat()" id="endChatButton" style="display: none;">結束會話</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="active-customer-list" id="activeCustomerList">
+    <h3>正在對話的客戶</h3>
+    <!-- 已接通的客戶清單 -->
+  </div>
+
+  <script>
+    const customers = [
+      { id: 1, name: 'Alice' },
+      { id: 2, name: 'Bob' },
+      { id: 3, name: 'Charlie' }
+    ];
+
+    const messages = {};
+    let currentCustomer = null;
+    let nextCustomerId = 4;
+    let guestCount = 1;
+    const connectedCustomerIds = new Set(); // 追蹤已接通客戶
+    const activeChats = {}; // 追蹤當前對話的客戶
+
+    const sampleReplies = [
+      '您好，請問有什麼可以幫忙的？',
+      '我想問一下我的訂單狀態',
+      '可以協助我重設密碼嗎？',
+      '我找不到付款按鈕',
+      '謝謝你！',
+    ];
+
+    function loadQueue() {
+      const queueEl = document.getElementById('queue');
+      queueEl.innerHTML = '<h3>排隊中客戶</h3>';
+
+      customers.forEach(c => {
+        if (connectedCustomerIds.has(c.id)) return; // 若已接通，跳過
+
+        const div = document.createElement('div');
+        div.className = 'customer';
+        div.innerHTML = `
+          <span>${c.name}</span>
+          <button onclick="connectTo(${c.id})">接通</button>
+        `;
+        queueEl.appendChild(div);
+      });
+    }
+
+    function connectTo(id) {
+      if (connectedCustomerIds.has(id)) return; // 防止重複接通
+
+      connectedCustomerIds.add(id); // 標記為已接通
+      currentCustomer = customers.find(c => c.id === id);
+      activeChats[id] = currentCustomer; // 把已接通客戶加入對話清單
+      document.getElementById('chatTitle').textContent = `與 ${currentCustomer.name} 聊天中`;
+      document.getElementById('endChatButton').style.display = 'inline-block'; // 顯示結束會話按鈕
+      renderChat();
+      loadQueue(); // 重新載入排隊清單，移除已接通者
+      updateActiveCustomerList();
+    }
+
+    function renderChat() {
+      const box = document.getElementById('chatBox');
+      box.innerHTML = '';
+      const msgs = messages[currentCustomer.id] || [];
+      msgs.forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'message ' + (m.from === 'me' ? 'me' : 'customer-msg');
+        div.textContent = m.content;
+        box.appendChild(div);
+      });
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function sendMessage() {
+      const input = document.getElementById('messageInput');
+      const content = input.value.trim();
+      if (!currentCustomer || !content) return;
+
+      if (!messages[currentCustomer.id]) messages[currentCustomer.id] = [];
+      messages[currentCustomer.id].push({ from: 'me', content });
+      input.value = '';
+      renderChat();
+    }
+
+    function endChat() {
+      if (currentCustomer) {
+        connectedCustomerIds.delete(currentCustomer.id); // 移除已接通客戶
+        delete activeChats[currentCustomer.id]; // 移除對話
+        loadQueue(); // 重新載入排隊清單
+        updateActiveCustomerList(); // 更新正在對話的客戶清單
+        document.getElementById('chatBox').innerHTML = ''; // 清空對話框
+        document.getElementById('chatTitle').textContent = '請選擇一位客戶';
+        document.getElementById('endChatButton').style.display = 'none'; // 隱藏結束會話按鈕
+      }
+    }
+
+    function updateActiveCustomerList() {
+      const activeListEl = document.getElementById('activeCustomerList');
+      activeListEl.innerHTML = '<h3>正在對話的客戶</h3>';
+
+      for (let id in activeChats) {
+        const customer = activeChats[id];
+        const div = document.createElement('div');
+        div.className = 'active-customer';
+        div.innerHTML = `
+          <span>${customer.name}</span>
+          <button onclick="endChatForCustomer(${customer.id})">結束會話</button>
+        `;
+        activeListEl.appendChild(div);
+      }
+    }
+
+    function endChatForCustomer(id) {
+      if (activeChats[id]) {
+        currentCustomer = activeChats[id];
+        endChat();
+      }
+    }
+
+    function simulateCustomerMessages() {
+      setInterval(() => {
+        if (customers.length === 0) return;
+        const customer = customers[Math.floor(Math.random() * customers.length)];
+        const message = sampleReplies[Math.floor(Math.random() * sampleReplies.length)];
+
+        if (!messages[customer.id]) messages[customer.id] = [];
+        messages[customer.id].push({ from: 'customer', content: message });
+
+        if (currentCustomer && currentCustomer.id === customer.id) {
+          renderChat();
+        }
+      }, 5000);
+    }
+
+    function addNewCustomer() {
+      setInterval(() => {
+        const name = `Guest_${guestCount++}`;
+        const newCustomer = { id: nextCustomerId++, name };
+        customers.push(newCustomer);
+        loadQueue();
+        console.log(`新客戶加入排隊：${name}`);
+      }, 10000); // 每 10 秒加入一位
+    }
+
+    loadQueue();
+    simulateCustomerMessages();
+    addNewCustomer();
+  </script>
+</body>
+</html>

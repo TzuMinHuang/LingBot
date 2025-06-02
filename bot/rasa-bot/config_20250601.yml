@@ -1,0 +1,30 @@
+# config.yml
+version: "3.1"
+
+language: zh                                # 1. 中文語言設定
+pipeline:
+- name: "JiebaTokenizer"                    # 2. 中文詞切分
+    # dictionary_path: "path/to/dict.txt"   # 可選：自定義詞庫
+- name: "RegexFeaturizer"                   # 5. 正則特徵 (搭配實體抽取)
+- name: "LexicalSyntacticFeaturizer"        # 補充詞彙／詞性特徵
+- name: "CountVectorsFeaturizer"            # 3. 單詞向量化
+  token_pattern: None                       # 搭配 Jieba，關閉預設 token_pattern :contentReference[oaicite:5]{index=5}
+- name: "CountVectorsFeaturizer"            # 3. 角色級 (char) 向量化
+  analyzer: char_wb
+- name: "DIETClassifier"                    # 4. 核心分類與實體辨識器
+  epochs: 100
+- name: "EntitySynonymMapper"               # 同義詞對應
+- name: "RegexEntityExtractor"              # 5. 根據 regex 實體抽取
+- name: "FallbackClassifier"                # 無意圖時退回 fallback
+  threshold: 0.3
+  ambiguity_threshold: 0.1
+
+policies:
+- name: RulePolicy
+- name: MemoizationPolicy
+- name: UnexpecTEDIntentPolicy
+- name: FallbackPolicy                      # 低信心時觸發 fallback
+  nlu_threshold: 0.3
+  core_threshold: 0.3
+  fallback_action_name: "action_default_fallback"
+assistant_id: 20250507-065339-moderato-pollock

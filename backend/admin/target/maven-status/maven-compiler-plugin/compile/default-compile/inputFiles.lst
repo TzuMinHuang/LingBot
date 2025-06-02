@@ -1,0 +1,12 @@
+/Users/j/web/chatbot/docker_env_with_seed/backend/admin/src/main/java/idv/hzm/app/admin/AdminApplication.java
+/Users/j/web/chatbot/docker_env_with_seed/backend/admin/src/main/java/idv/hzm/app/admin/config/RabbitMQConfig.java
+/Users/j/web/chatbot/docker_env_with_seed/backend/admin/src/main/java/idv/hzm/app/admin/config/RedisConfig.java
+/Users/j/web/chatbot/docker_env_with_seed/backend/admin/src/main/java/idv/hzm/app/admin/controller/QueueController.java
+/Users/j/web/chatbot/docker_env_with_seed/backend/admin/src/main/java/idv/hzm/app/admin/dto/QueueInfoDto.java
+/Users/j/web/chatbot/docker_env_with_seed/backend/admin/src/main/java/idv/hzm/app/admin/entity/ChatRoom.java
+/Users/j/web/chatbot/docker_env_with_seed/backend/admin/src/main/java/idv/hzm/app/admin/entity/Pair.java
+/Users/j/web/chatbot/docker_env_with_seed/backend/admin/src/main/java/idv/hzm/app/admin/repo/PairRepository.java
+/Users/j/web/chatbot/docker_env_with_seed/backend/admin/src/main/java/idv/hzm/app/admin/service/ChatRoomService.java
+/Users/j/web/chatbot/docker_env_with_seed/backend/admin/src/main/java/idv/hzm/app/admin/service/QueueService.java
+/Users/j/web/chatbot/docker_env_with_seed/backend/admin/src/main/java/idv/hzm/app/admin/service/impl/LuaQueueService.java
+/Users/j/web/chatbot/docker_env_with_seed/backend/admin/src/main/java/idv/hzm/app/admin/service/impl/ZsetQueueService.java
