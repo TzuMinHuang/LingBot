@@ -1,0 +1,101 @@
+version: "3.1"
+
+nlu:
+  - intent: help_customer
+    examples: |
+      - 幫幫我
+      - 你有什麼服戶？
+      - 你可以做什麼？
+
+  - intent: faq_member
+    examples: |
+      - 如何註冊成為會員？
+      - 我怎麼加入會員？
+      - 我要怎麼成為網站會員？
+
+  - intent: faq_shopping
+    examples: |
+      - 如何進行購物？
+      - 如何選擇商品並加入購物車？
+      - 購物流程是什麼？
+
+  - intent: faq_payment
+    examples: |
+      - 付款方式有哪些？
+      - 如何使用信用卡付款？
+      - 支付時遇到問題該怎麼辦？
+
+  - intent: faq_return
+    examples: |
+      - 如何退貨？
+      - 退貨的流程是什麼？
+      - 退貨需要哪些資料？
+      - 我想退貨
+      - 可以退貨嗎？
+      - 商品可以退回去嗎？
+      - 請問怎麼退貨？
+      - 我買錯了，要退貨
+      - 我要申請退貨
+      - 東西壞了可以退嗎？
+
+
+  - intent: faq_invoice
+    examples: |
+      - 如何索取發票？
+      - 發票丟失怎麼辦？
+      - 我可以開電子發票嗎？
+
+  - intent: query_order
+    examples: |
+      - 查詢訂單 [202403001](order_id)
+      - 我想查一下訂單狀態
+      - 查詢我的訂單 [ORD998877](order_id)
+      - 訂單編號是 [12345678](order_id)，幫我查一下
+      - 幫我查一下 [ORD123456](order_id) 訂單的狀態
+      - 請問 [20240115](order_id) 的訂單出貨了嗎？
+      - 幫我查詢一下訂單號碼是 [87654321](order_id)
+      - 我的訂單是 [ORD987654](order_id)，查詢一下
+      - 幫我查一下 [ORD123456](order_id) 訂單的狀態
+      - 幫我查一下 [ORD998877](order_id)
+      - 請問 [ORD112233](order_id) 訂單出貨了沒？
+      - [ORD554433](order_id) 的訂單狀況？
+      
+  - intent: place_order
+    examples: |
+      - 我要下訂單
+      - 幫我訂購一台手機
+      - 我想買一台筆記型電腦
+
+  - intent: transfer_to_human
+    examples: |
+      - 轉接給客服
+      - 請幫我找真人客服
+      - 我需要人工服務
+
+  - intent: cancel_transfer
+    examples: |
+      - 取消轉接
+      - 我不想轉接給客服
+      - 停止轉接給人工客服
+
+  - intent: greet
+    examples: |
+      - 你好
+      - 嗨
+      - 早安
+
+  - intent: goodbye
+    examples: |
+      - 再見
+      - 謝謝，再見
+      - 掰掰
+
+  - intent: fallback
+    examples: |
+      - 不知道怎麼回答你
+      - 我不懂你在說什麼
+      - 這問題我無法理解
+
+regex:
+  - name: order_id
+    pattern: "\\b(ORD)?\\d{6,9}\\b"

@@ -1,0 +1,12 @@
+[
+  {
+    "roomId": "ROOM-123",
+    "agentId": "A001",
+    "startTime": "2025-05-01T09:00:00Z",
+    "endTime": "2025-05-01T09:15:00Z",
+    "messages": [
+      { "sender": "customer", "text": "Hi" },
+      { "sender": "agent", "text": "您好，請問需要什麼幫忙？" }
+    ]
+  }
+]

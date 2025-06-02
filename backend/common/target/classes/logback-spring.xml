@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE configuration>
+<configuration>
+    <!--引用默認日誌配置-->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <!--使用默認的控制台日誌輸出實現-->
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+    <!--應用名稱-->
+    <springProperty scope="context" name="APP_NAME" source="spring.application.name" defaultValue="springBoot"/>
+    <!--日誌文件保存路徑-->
+    <property name="LOG_FILE_PATH" value="${LOG_FILE:-${LOG_PATH:-${LOG_TEMP:-${java.io.tmpdir:-/tmp}}}/logs}"/>
+    <!--LogStash訪問host-->
+    <springProperty name="LOG_STASH_HOST" scope="context" source="logstash.host" defaultValue="localhost"/>
+    <!--是否開啟LogStash插件內部日誌-->
+    <springProperty name="ENABLE_INNER_LOG" scope="context" source="logstash.enableInnerLog" defaultValue="false"/>
+
+    <!--DEBUG日誌輸出到文件-->
+    <appender name="FILE_DEBUG"
+              class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <!--輸出DEBUG以上級別日誌-->
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>DEBUG</level>
+        </filter>
+        <encoder>
+            <!--設置為默認的文件日誌格式-->
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!--設置文件命名格式-->
+            <fileNamePattern>${LOG_FILE_PATH}/debug/${APP_NAME}-%d{yyyy-MM-dd}-%i.log</fileNamePattern>
+            <!--設置日誌文件大小，超過就重新生成文件，默認10M-->
+            <maxFileSize>${LOG_FILE_MAX_SIZE:-10MB}</maxFileSize>
+            <!--日誌文件保留天數，默認30天-->
+            <maxHistory>${LOG_FILE_MAX_HISTORY:-30}</maxHistory>
+        </rollingPolicy>
+    </appender>
+
+    <!--ERROR日誌輸出到文件-->
+    <appender name="FILE_ERROR"
+              class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <!--只輸出ERROR級別的日誌-->
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>ERROR</level>
+            <onMatch>ACCEPT</onMatch>
+            <onMismatch>DENY</onMismatch>
+        </filter>
+        <encoder>
+            <!--設置為默認的文件日誌格式-->
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!--設置文件命名格式-->
+            <fileNamePattern>${LOG_FILE_PATH}/error/${APP_NAME}-%d{yyyy-MM-dd}-%i.log</fileNamePattern>
+            <!--設置日誌文件大小，超過就重新生成文件，默認10M-->
+            <maxFileSize>${LOG_FILE_MAX_SIZE:-10MB}</maxFileSize>
+            <!--日誌文件保留天數，默認30天-->
+            <maxHistory>${LOG_FILE_MAX_HISTORY:-30}</maxHistory>
+        </rollingPolicy>
+    </appender>
+
+    <!--DEBUG日誌輸出到LogStash-->
+    <appender name="LOG_STASH_DEBUG" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>DEBUG</level>
+        </filter>
+        <destination>${LOG_STASH_HOST}:4560</destination>
+        <addDefaultStatusListener>${ENABLE_INNER_LOG}</addDefaultStatusListener>
+        <encoder charset="UTF-8" class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp>
+                    <timeZone>Asia/Shanghai</timeZone>
+                </timestamp>
+                <!--自定義日誌輸出格式-->
+                <pattern>
+                    <pattern>
+                        {
+                        "project": "lingbot",
+                        "level": "%level",
+                        "service": "${APP_NAME:-}",
+                        "pid": "${PID:-}",
+                        "thread": "%thread",
+                        "class": "%logger",
+                        "message": "%message",
+                        "stack_trace": "%exception{20}"
+                        }
+                    </pattern>
+                </pattern>
+            </providers>
+        </encoder>
+    </appender>
+
+    <!--ERROR日誌輸出到LogStash-->
+    <appender name="LOG_STASH_ERROR" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>ERROR</level>
+            <onMatch>ACCEPT</onMatch>
+            <onMismatch>DENY</onMismatch>
+        </filter>
+        <destination>${LOG_STASH_HOST}:4561</destination>
+        <addDefaultStatusListener>${ENABLE_INNER_LOG}</addDefaultStatusListener>
+        <encoder charset="UTF-8" class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp>
+                    <timeZone>Asia/Shanghai</timeZone>
+                </timestamp>
+                <!--自定義日誌輸出格式-->
+                <pattern>
+                    <pattern>
+                        {
+                        "project": "lingbot",
+                        "level": "%level",
+                        "service": "${APP_NAME:-}",
+                        "pid": "${PID:-}","thread": "%thread",
+                        "class": "%logger",
+                        "message": "%message",
+                        "stack_trace": "%exception{20}"
+                        }
+                    </pattern>
+                </pattern>
+            </providers>
+        </encoder>
+    </appender>
+
+    <!--業務日誌輸出到LogStash-->
+    <appender name="LOG_STASH_BUSINESS" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+        <destination>${LOG_STASH_HOST}:4562</destination>
+        <addDefaultStatusListener>${ENABLE_INNER_LOG}</addDefaultStatusListener>
+        <encoder charset="UTF-8" class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp>
+                    <timeZone>Asia/Shanghai</timeZone>
+                </timestamp>
+                <!--自定義日誌輸出格式-->
+                <pattern>
+                    <pattern>
+                        {
+                        "project": "lingbot",
+                        "level": "%level",
+                        "service": "${APP_NAME:-}",
+                        "pid": "${PID:-}",
+                        "thread": "%thread",
+                        "class": "%logger",
+                        "message": "%message",
+                        "stack_trace": "%exception{20}"
+                        }
+                    </pattern>
+                </pattern>
+            </providers>
+        </encoder>
+    </appender>
+
+    <!--接口訪問記錄日誌輸出到LogStash-->
+    <appender name="LOG_STASH_RECORD" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+        <destination>${LOG_STASH_HOST}:4563</destination>
+        <addDefaultStatusListener>${ENABLE_INNER_LOG}</addDefaultStatusListener>
+        <encoder charset="UTF-8" class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp>
+                    <timeZone>Asia/Shanghai</timeZone>
+                </timestamp>
+                <!--自定義日誌輸出格式-->
+                <pattern>
+                    <pattern>
+                        {
+                        "project": "lingbot",
+                        "level": "%level",
+                        "service": "${APP_NAME:-}",
+                        "class": "%logger",
+                        "message": "%message"
+                        }
+                    </pattern>
+                </pattern>
+            </providers>
+        </encoder>
+    </appender>
+
+    <!--控制框架輸出日誌-->
+    <logger name="org.slf4j" level="INFO"/>
+    <logger name="springfox" level="INFO"/>
+    <logger name="io.swagger" level="INFO"/>
+    <logger name="org.springframework" level="INFO"/>
+    <logger name="org.hibernate.validator" level="INFO"/>
+
+    <root level="DEBUG">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE_DEBUG"/>
+        <appender-ref ref="FILE_ERROR"/>
+        <appender-ref ref="LOG_STASH_DEBUG"/>
+        <appender-ref ref="LOG_STASH_ERROR"/>
+    </root>
+
+    <logger name="idv.hzm.app.common.log.WebLogAspect" level="DEBUG">
+        <appender-ref ref="LOG_STASH_RECORD"/>
+    </logger>
+
+    <logger name="idv.hzm.app" level="DEBUG">
+        <appender-ref ref="LOG_STASH_BUSINESS"/>
+    </logger>
+</configuration>

@@ -1,0 +1,45 @@
+server:
+  port: 9200
+
+spring:
+  application:
+    name: bot
+  # PostgreSQL 設定
+  datasource:
+    url: jdbc:postgresql://${DATASOURCE_URL}:${DATASOURCE_PORT}/chatdb
+    username: chatuser
+    password: chatpass
+    hikari:
+      initialization-fail-timeout: 60000 # 等待最長 60 秒
+      connection-timeout: 10000
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: update
+  # MongoDB 設定
+  data:
+    mongodb:
+      uri: mongodb://${MONGODB_URI}:${MONGODB_PORT}/chatlogdb
+  # Redis 設定
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      client-name: default
+      client-type: lettuce
+  # RabbitMQ 設定
+  rabbitmq:
+    host: ${RABBITMQ_HOST}
+    port: ${RABBITMQ_PORT}
+    username: guest
+    password: guest
+
+rasa:
+  base-url: http://${RASA_IP}:${RASA_PORT}
+
+admin:
+  base-url: http://${ADMIN_IP}:${ADMIN_PORT}
+#    url: jdbc:h2:mem:chatdb
+#    driverClassName: org.h2.Driver
+#    username: sa
+#    password: 
+
