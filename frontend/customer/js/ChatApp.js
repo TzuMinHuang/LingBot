@@ -21,7 +21,7 @@ export class ChatApp {
 
   async _initSession() {
     try {
-      const res = await fetch(`${this.baseUrl}/api/chat/initial`, {
+      const res = await fetch(`${this.baseUrl}/chat/initial`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -30,6 +30,7 @@ export class ChatApp {
 
       this.chatService = new ChatService(`${this.baseUrl}/ws`, this.sessionId, (msg) => {
         this.eventBus.emit('incoming', msg.payload?.content || '');
+        this.chatUI.addBotMessageWithCards();
       });
     } catch (e) {
       console.error("初始化失敗", e);

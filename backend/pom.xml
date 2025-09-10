@@ -7,9 +7,6 @@
   <name>lingbot</name>
   <description>lingbot project for Spring Boot</description>
   <modules>
-    <module>common</module>
-    <module>security</module>
-    <module>portal</module>
     <module>admin</module>
     <module>bot</module>
   </modules>

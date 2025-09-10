@@ -1,4 +1,4 @@
-version: '3.8'
+# version: '3.8'
 services:
   rabbitmq:
     image: rabbitmq:3-management
@@ -83,6 +83,16 @@ services:
       - redis
       - mongodb
       - postgres
+    networks:
+      - default
+
+  rasa-bot:
+    build: ./bot/rasa-bot
+    container_name: rasa-bot
+    volumes:
+      - ./models:/app/models
+    ports:
+      - "5005:5005"
     networks:
       - default
 

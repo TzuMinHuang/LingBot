@@ -8,6 +8,7 @@ export class ChatUI {
   
       this._setupInputHandler();
       this._setupButtonHandler();
+      this.showThinking();
     }
   
     _setupInputHandler() {
@@ -87,5 +88,65 @@ export class ChatUI {
       }
       return false;
     }
-  }
+
+ addBotMessageWithCards(message, cardsHtml) {
+  const li = document.createElement('li');
+  li.classList.add('chat', 'incoming');
+
+  // 卡片容器
+  const cardContainer = document.createElement('div');
+  cardContainer.classList.add('card-slider');
+  cardContainer.innerHTML = `
+  <div class="card">
+    <h3>阿發猜你想知道</h3>
+    <div class="btns">
+      <button>保費分期零利率</button>
+      <button>本期帳單金額</button>
+      <button>刷卡消費分期</button>
+    </div>
+  </div>
+  <div class="card">
+    <h3>信用卡熱門查詢</h3>
+    <div class="btns">
+      <button>查詢消費明細</button>
+      <button>查詢可用額度</button>
+      <button>申請額度調整</button>
+    </div>
+  </div>
+  <div class="card">
+    <h3>信用卡刷卡必知</h3>
+    <div class="btns">
+      <button>查詢回饋點數</button>
+      <button>申請預借現金</button>
+      <button>補寄電子帳單</button>
+    </div>
+  </div>
+`;
+
+  li.appendChild(cardContainer);
+  this.chatbox.appendChild(li);
+
+  // 初始化 Slick
+  $(cardContainer).slick({
+    slidesToShow: 1,
+    slidesToScroll: 1,
+    dots: true,
+    infinite: false,
+    arrows: true
+  });
+
+  // 點擊按鈕也會發送訊息
+  cardContainer.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      this.sendCallback(btn.textContent);
+    });
+  });
+
+  this.chatbox.scrollTop = this.chatbox.scrollHeight;
+}
+
+// 範例卡片 HTML
+
+
+}
   

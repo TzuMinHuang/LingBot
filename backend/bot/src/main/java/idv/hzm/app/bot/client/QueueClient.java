@@ -7,7 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
-import idv.hzm.app.bot.client.dto.QueueInfoDto;
+import idv.hzm.app.bot.dto.QueueInfoDto;
 import idv.hzm.app.common.api.CommonResult;
 import idv.hzm.app.common.api.ResultCode;
 import idv.hzm.app.common.util.Json2Util;

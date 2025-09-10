@@ -1,9 +1,114 @@
 server:
   port: 9200
-
+  servlet:
+    context-path: /bot
 spring:
+  profiles:
+    active: dev
   application:
     name: bot
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  ai:
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        model: llama3.1:latest # deepseek-r1:1.5b, gemma3:1b
+      init:
+        pull-model-strategy: always
+        chat:
+          additional-models:
+            - llama3.1
+        timeout: 60s
+        max-retries: 1
+    chat:
+      memory:
+        repository:
+          jdbc:
+            # https://docs.spring.io/spring-ai/reference/1.0/api/chat-memory.html#_schema_initialization
+            initialize-schema: always
+            schema: classpath:sql/schema-h2.sql
+  # PostgreSQL 設定
+  datasource:
+    url: jdbc:h2:mem:~/demo-chatbot
+    driverClassName: org.h2.Driver
+    username: sa
+    password: password
+    primary:
+      url: jdbc:postgresql://localhost:5432/chatdb
+      username: chatuser
+      password: chatpass
+      driverClassName: org.postgresql.Driver
+      hikari:
+        initialization-fail-timeout: 60000 # 等待最長 60 秒
+        connection-timeout: 10000
+        pool-name: primary_pool
+        maximum-pool-size: 20
+        minimum-idle: 10
+        idle-timeout: 30000
+        max-lifetime: 600000
+        validation-timeout: 5000
+        connection-test-query: SELECT 1
+    secondary:
+      url: jdbc:h2:mem:chatdb
+      username: sa
+      password: 
+      driverClassName: org.h2.Driver
+      hikari:
+        initialization-fail-timeout: 60000 # 等待最長 60 秒
+        connection-timeout: 10000
+        pool-name: primary_pool
+        maximum-pool-size: 20
+        minimum-idle: 10
+        idle-timeout: 30000
+        max-lifetime: 600000
+        validation-timeout: 5000
+        connection-test-query: SELECT 1
+  h2:
+    console:
+      enabled: true
+      path: /h2
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: update
+  # MongoDB 設定
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/chatlogdb
+    # Redis 設定
+    redis:
+      host: localhost
+      port: 6379
+      client-name: default
+      client-type: lettuce
+      lettuce: 
+        dns:
+          resolver: JVM
+  # RabbitMQ 設定
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+javamelody:
+  enabled: true
+  excluded-datasources: secretSource,topSecretSource
+  spring-monitoring-enabled: true
+  init-parameters:
+    log: true
+admin:
+  base-url: http://localhost:9100/admin
+ollama:
+  base-url: http://localhost:9100/ollama
+---
+spring:
+  config:
+    activate:
+      on-profile: test
   # PostgreSQL 設定
   datasource:
     url: jdbc:postgresql://${DATASOURCE_URL}:${DATASOURCE_PORT}/chatdb
@@ -32,14 +137,5 @@ spring:
     port: ${RABBITMQ_PORT}
     username: guest
     password: guest
-
-rasa:
-  base-url: http://${RASA_IP}:${RASA_PORT}
-
 admin:
-  base-url: http://${ADMIN_IP}:${ADMIN_PORT}
-#    url: jdbc:h2:mem:chatdb
-#    driverClassName: org.h2.Driver
-#    username: sa
-#    password: 
-
+  base-url: http://localhost:9100/admin
