@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-TW" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Industrial Chatbot Interface">
+  <title>chatbot in javascript</title>
+
+  <link rel="stylesheet" href="../css/style.css">
+  <!-- Material Icons -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,400,0,0">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+
+  <!-- Markdown rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+
+  <!-- App modules -->
+  <script type="module" src="../js/env-config.js"></script>
+  <script type="module" src="../js/AuthService.js"></script>
+  <script type="module" src="../js/ChatUI.js"></script>
+  <script type="module" src="../js/ChatService.js"></script>
+  <script type="module" src="../js/EventBus.js"></script>
+  <script type="module" src="../js/ChatApp.js"></script>
+  <script type="module" src="../js/App.js"></script>
+</head>
+<body>
+  <!-- Chatbot Window -->
+  <div class="chatbot">
+    <header>
+      <h2>Industrial AI</h2>
+    </header>
+
+    <ul class="chatbox" role="log" aria-live="polite" aria-label="對話紀錄"></ul>
+
+    <div class="chat-input">
+      <textarea required placeholder="輸入指令..." maxlength="500" aria-label="輸入訊息"></textarea>
+      <div class="input-meta">
+        <span id="suggest-btn" class="material-symbols-outlined" role="button" aria-label="常見問題" title="常見問題" tabindex="0">help</span>
+        <span class="char-counter" aria-live="off">0 / 500</span>
+      </div>
+      <span id="action-btn" class="material-symbols-outlined" role="button" aria-label="語音輸入" title="語音輸入" tabindex="0">mic</span>
+      <span id="end-btn" class="material-symbols-outlined" role="button" aria-label="停止回覆" title="停止回覆" tabindex="0">stop_circle</span>
+    </div>
+  </div>
+</body>
+</html>

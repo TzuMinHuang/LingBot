@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(for file in js/*.js widgets/*.js)",
+      "Bash(do node -c \"$file\")",
+      "Bash(echo \"✓ $file: OK\")",
+      "Bash(echo \"✗ $file: SYNTAX ERROR\")",
+      "Bash(done)",
+      "Bash(curl -s http://localhost:11434/api/generate -d '{\"\"model\"\":\"\"llama3.1:8b\"\",\"\"prompt\"\":\"\"Say hello in one sentence\"\",\"\"stream\"\":false}')",
+      "Bash(python3 -m json.tool)"
+    ]
+  }
+}

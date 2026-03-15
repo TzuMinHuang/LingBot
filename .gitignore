@@ -1,5 +1,7 @@
+.env
 bot/rasa-bot/.config/*
 bot/rasa-bot/.rasa/*
 bot/rasa-bot/models/*
 bot/rasa-bot/rasa-env/*
 /.metadata/
+data/
