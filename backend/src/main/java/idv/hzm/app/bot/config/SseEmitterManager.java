@@ -1,6 +1,7 @@
 package idv.hzm.app.bot.config;
 
 import java.io.IOException;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
@@ -74,5 +75,9 @@ public class SseEmitterManager {
 		if (emitter != null) {
 			emitter.complete();
 		}
+	}
+
+	public Set<String> getConnectedSessions() {
+		return emitters.keySet();
 	}
 }

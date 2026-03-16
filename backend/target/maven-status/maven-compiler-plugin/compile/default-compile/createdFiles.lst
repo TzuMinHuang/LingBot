@@ -1,6 +1,7 @@
 idv/hzm/app/bot/config/RedisStreamConfig.class
 idv/hzm/app/bot/service/ChatSessionService.class
 idv/hzm/app/bot/dto/MessagePayload.class
+idv/hzm/app/bot/dto/QueuePayload.class
 idv/hzm/app/bot/utils/URLUtil.class
 idv/hzm/app/bot/repo/ChatMessageRepository.class
 idv/hzm/app/bot/config/SseRedisSubscriber.class
@@ -33,6 +34,7 @@ idv/hzm/app/bot/dto/QueueInfoDto.class
 idv/hzm/app/bot/aspect/WebLogAspect.class
 idv/hzm/app/bot/dto/UserDto.class
 idv/hzm/app/bot/config/RedisConfig.class
+idv/hzm/app/bot/config/QueueStatusPublisher.class
 idv/hzm/app/bot/entity/ChatMessage.class
 idv/hzm/app/bot/config/SuggestionSeeder.class
 idv/hzm/app/bot/entity/Session.class

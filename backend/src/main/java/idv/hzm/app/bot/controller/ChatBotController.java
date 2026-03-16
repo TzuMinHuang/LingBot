@@ -99,6 +99,13 @@ public class ChatBotController {
 			return ResponseEntity.badRequest().body("content exceeds max length");
 		}
 
+		// 冪等性檢查：同一時間只能提問一次
+		if (!chatRedisService.acquireRequestLock(sessionId)) {
+			logger.warn("Concurrent message from session {}, rejected", sessionId);
+			return ResponseEntity.status(org.springframework.http.HttpStatus.TOO_MANY_REQUESTS)
+					.body("Another request is in progress. Please wait.");
+		}
+
 		try {
 			// Track question frequency for suggestions
 			suggestionService.recordQuestion(content);
@@ -115,8 +122,22 @@ public class ChatBotController {
 			return ResponseEntity.ok().build();
 		} catch (Exception e) {
 			logger.error("Failed to enqueue message to Redis Stream: {}", e.getMessage());
+			chatRedisService.releaseRequestLock(sessionId);
 			return ResponseEntity.internalServerError().body("failed to enqueue message");
 		}
+	}
+
+	/**
+	 * 手動取消目前的提問（釋放鎖）
+	 */
+	@PostMapping("/chat/{sessionId}/stop")
+	public ResponseEntity<?> stop(@PathVariable String sessionId) {
+		if (!isValidSessionId(sessionId)) {
+			return ResponseEntity.badRequest().body("invalid sessionId");
+		}
+		chatRedisService.releaseRequestLock(sessionId);
+		logger.info("[STOP] Released lock for sessionId: {}", sessionId);
+		return ResponseEntity.ok().build();
 	}
 
 	/**

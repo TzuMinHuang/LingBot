@@ -2,6 +2,7 @@
 /Users/j/web/chatbot/LingBot/backend/src/main/java/idv/hzm/app/bot/aspect/WebLogAspect.java
 /Users/j/web/chatbot/LingBot/backend/src/main/java/idv/hzm/app/bot/client/AnythingLLMClient.java
 /Users/j/web/chatbot/LingBot/backend/src/main/java/idv/hzm/app/bot/config/AsyncConfig.java
+/Users/j/web/chatbot/LingBot/backend/src/main/java/idv/hzm/app/bot/config/QueueStatusPublisher.java
 /Users/j/web/chatbot/LingBot/backend/src/main/java/idv/hzm/app/bot/config/RedisConfig.java
 /Users/j/web/chatbot/LingBot/backend/src/main/java/idv/hzm/app/bot/config/RedisStreamConfig.java
 /Users/j/web/chatbot/LingBot/backend/src/main/java/idv/hzm/app/bot/config/SseEmitterManager.java
@@ -17,6 +18,7 @@
 /Users/j/web/chatbot/LingBot/backend/src/main/java/idv/hzm/app/bot/dto/InitialClientInfo.java
 /Users/j/web/chatbot/LingBot/backend/src/main/java/idv/hzm/app/bot/dto/MessagePayload.java
 /Users/j/web/chatbot/LingBot/backend/src/main/java/idv/hzm/app/bot/dto/QueueInfoDto.java
+/Users/j/web/chatbot/LingBot/backend/src/main/java/idv/hzm/app/bot/dto/QueuePayload.java
 /Users/j/web/chatbot/LingBot/backend/src/main/java/idv/hzm/app/bot/dto/ResultCode.java
 /Users/j/web/chatbot/LingBot/backend/src/main/java/idv/hzm/app/bot/dto/UserDto.java
 /Users/j/web/chatbot/LingBot/backend/src/main/java/idv/hzm/app/bot/dto/UserRole.java

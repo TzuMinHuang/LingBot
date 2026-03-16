@@ -26,16 +26,19 @@
 LingBot 是一個 AI 聊天機器人平台，結合 Spring Boot 後端、Redis 訊息佇列、PostgreSQL 持久化，以及 AnythingLLM 作為 LLM 推理引擎。
 
 ```
-瀏覽器 (SockJS / STOMP)
+瀏覽器 (SSE / REST)
    ↕
 Nginx (port 80)
    ↕
-backend-service (Spring Boot, port 9200)
+backend-service (Spring Boot, port 9200) - 支援多實例負載平衡
    ↕                    ↕
-Redis Streams       PostgreSQL
+Redis (Streams/PubSub)  PostgreSQL
    ↕
 AnythingLLM (port 3001)  ← SSE Streaming
 ```
+
+> [!NOTE]
+> **多實例支援**：`BotConsumer` 在啟動時會生成唯一的 `INSTANCE_ID` 並附加於 Consumer Name，確保多個後端實例可同時加入同一個 Redis Stream 消費者組。
 
 ---
 
@@ -46,21 +49,32 @@ AnythingLLM (port 3001)  ← SSE Streaming
 ```
 [前端] 使用者輸入
   → ChatApp._handleUserMessage()
-  → ChatService.sendMessage()
-  → WebSocketClient.sendMessage()   STOMP: /app/chat/{sessionId}/send
-  → ChatWebSocketController.incomingUser()
-  → Redis Stream: stream:bot:incoming  [sessionId, content]
+  → ChatBotController.send()
+      1. [冪等性] 檢查 Redis `chat:active:{sessionId}`
+      2. [持久化] 儲存 User Message (ChatHistoryService)
+      3. [入隊] 寫入 `stream:bot:incoming`
+  → Redis Stream: stream:bot:incoming  [sessionId, content, interactionId]
   → BotConsumer.onMessage()
-  → AnythingLLMClient.chatStream()  POST /api/v1/workspace/{slug}/stream-chat
-  → SSE 回應 (每個 token 一個 chunk)
-  ┌─ chunk (close=false): EventDto{type=STREAM_CHUNK, payload.content=token}
-  └─ close (close=true):  EventDto{type=STREAM_END,   payload.sources=[...]}
-  → Redis Pub/Sub: ws-channel
-  → WebSocketConfig.webSocketSubscriber()
-  → SimpMessagingTemplate → STOMP: /topic/user/{sessionId}/receive
+      1. [事件] 發布 `PROCESSING_START` → ws-channel
+      2. [呼叫] AnythingLLMClient.chatStream()
+      3. [串流] 解析 SSE 並發布 `STREAM_CHUNK` → ws-channel
+      4. [完成] 釋放 Redis 鎖，發布 `STREAM_END` → ws-channel
+  → Redis Pub/Sub: ws-channel (由 SseRedisSubscriber 轉發)
+  → SseEmitterManager → SSE: event: chat
   → ChatApp message handler
-  ┌─ STREAM_CHUNK → ChatUI.appendToStreamBubble(chunk)  逐字累加
-  └─ STREAM_END   → ChatUI.finishStreamBubble(sources)  附加參考資料
+  ┌─ PROCESSING_START → ChatUI.showProcessing()
+  ├─ QUEUE_UPDATE     → ChatUI.updateQueuePosition(pos)
+  ├─ STREAM_CHUNK      → ChatUI.appendToStreamBubble(chunk)
+  └─ STREAM_END        → ChatUI.finishStreamBubble(sources)
+```
+
+### 排隊位置更新 (SSE)
+
+```
+[後端] QueueStatusPublisher (每 5 秒執行)
+  → 計算 Stream 長度與消費者數量
+  → 發布 QUEUE_UPDATE EventDto → ws-channel
+  → 前端 ChatUI 更新排隊人次與重新整理按鈕
 ```
 
 ### 工作階段初始化
@@ -74,9 +88,8 @@ AnythingLLM (port 3001)  ← SSE Streaming
      生成 sessionId (Hashids), userId
      Redis 寫入 chat:session:{sessionId}
   → 回傳 InitialClientInfo{sessionId}
-  → ChatService 建立 WebSocket 連線
-  → STOMP SUBSCRIBE /topic/user/{sessionId}/receive
-  → WebSocketConfig 攔截 → WebSocketSessionManager.addSession()
+  → ChatService 建立 SSE 連線
+  → GET /bot/chat/{sessionId}/stream
 ```
 
 ---
@@ -95,35 +108,25 @@ AnythingLLM (port 3001)  ← SSE Streaming
 
 | 類別 | 說明 | 關鍵 Bean |
 |------|------|-----------|
-| `WebSocketConfig` | STOMP 端點設定、Redis Pub/Sub → WebSocket 橋接 | `RedisMessageListenerContainer`、`MessageListenerAdapter` |
-| `WebSocketSessionManager` | 追蹤 businessSessionId ↔ stompSessionId 對應關係 | — |
 | `RedisStreamConfig` | Redis Stream 監聽容器，poll 間隔 200ms | `StreamMessageListenerContainer` |
 | `RedisConfig` | Redis template，value 序列化為 JSON | `RedisTemplate<String, Object>` |
-| `RestTemplateConfig` | 同步 HTTP 客戶端 | `RestTemplate` |
 | `WebConfig` | CORS 設定 | — |
 | `ChatConfig` | MCP Server 工具客製化（logging） | `McpSyncClientCustomizer` |
+| `SseRedisSubscriber` | Redis Pub/Sub → SSE 轉發 (ws-channel) | `RedisMessageListenerContainer` |
+| `QueueStatusPublisher` | 每 5s 廣播排隊位置至 SSE | `@Scheduled broadcastQueueStatus` |
 | `RabbitMQConfig` | 已停用（RabbitMQ 已移除） | — |
 
-#### WebSocketConfig 詳細
+#### SseEmitterManager 詳細
 
-- STOMP 端點：`/ws`（含 SockJS fallback）
-- Broker prefix：`/topic`；Application prefix：`/app`
-- 攔截 `SUBSCRIBE /topic/user/{sessionId}/receive`，登錄至 `WebSocketSessionManager`
-- Redis channel `ws-channel` 訊息 → `EventDto` JSON → `SimpMessagingTemplate.convertAndSend()`
+- 管理所有活動中的 SSE Emitter。
+- 提供 `getConnectedSessions()` 返回目前所有在線的 sessionId。
+- 支援 `sendEvent()` 將 `EventDto` 傳送至指定客戶端。
 
-#### WebSocketSessionManager 詳細
+#### SseRedisSubscriber 詳細
 
-```
-userSessions:          Map<businessSessionId, Set<stompSessionId>>
-stompToBusinessSession: Map<stompSessionId, businessSessionId>
-lastHeartbeat:         Map<stompSessionId, Long>
-
-addSession(businessSessionId, stompSessionId)
-removeSession(stompSessionId)
-updateHeartbeat(stompSessionId)
-cleanInactiveSessions()  ← @Scheduled 每 30 秒執行，逾時閾值 2 分鐘
-@EventListener SessionDisconnectEvent → 自動清除
-```
+- 訂閱 Redis channel `ws-channel`。
+- 接收訊息後透過 `SseEmitterManager` 轉發至對應的 SSE Emitter。
+- 實現工作負載在多個後端實例間的同步推播。
 
 #### RedisStreamConfig 常數
 
@@ -140,9 +143,10 @@ CONSUMER_GROUP       = "bot-consumer-group"
 
 | 類別 | 端點 | 說明 |
 |------|------|------|
-| `ChatSessionController` | `POST /chat/initial` | 建立工作階段，回傳 `InitialClientInfo{sessionId}` |
-| `ChatWebSocketController` | `@MessageMapping /chat/{sessionId}/ping` | WebSocket 心跳（no-op） |
-| `ChatWebSocketController` | `@MessageMapping /chat/{sessionId}/send` | 接收使用者訊息，寫入 `stream:bot:incoming` |
+| `ChatBotController` | `GET /chat/{sessionId}/stream` | SSE 訂閱進入點 |
+| `ChatBotController` | `POST /chat/{sessionId}/send` | 接收訊息並實作冪等性鎖 (429 Conflict) |
+| `ChatBotController` | `POST /chat/{sessionId}/stop` | 使用者取消提問，釋放 Redis 鎖 |
+| `ChatBotController` | `GET /chat/{sessionId}/queue-position` | 取得排隊位置 (支援手動重新整理) |
 
 ---
 
@@ -208,6 +212,7 @@ chat:room:{sessionId}      → agentId
 queue:waiting              → Redis List (FIFO 等待隊列)
 online:agents              → Redis Set
 bind:user:{userId}         → agentId
+chat:active:{sessionId}    → 冪等性鎖 (TTL 10 min)
 ```
 
 ---
@@ -286,11 +291,11 @@ ActionService 在啟動時自動掃描 Action bean，建立 Map<type, Action>
 
 ### 資料傳輸物件 dto
 
-#### `EventDto` — 主要 WebSocket 傳輸單元
+#### `EventDto` — 主要 SSE 傳輸單元
 
 ```java
 String sessionId
-String type      // "MESSAGE" | "STREAM_CHUNK" | "STREAM_END"
+String type      // "STREAM_CHUNK" | "STREAM_END" | "PROCESSING_START" | "QUEUE_UPDATE"
 BasePayload payload
 ```
 
@@ -298,7 +303,10 @@ BasePayload payload
 
 ```java
 @JsonTypeInfo(property = "type")
-@JsonSubTypes({ "message" → MessagePayload })
+@JsonSubTypes({ 
+  "message" → MessagePayload,
+  "queue"   → QueuePayload
+})
 ```
 
 #### `MessagePayload` extends BasePayload
@@ -384,21 +392,21 @@ App.js
 _initSession()       POST /bot/chat/initial → sessionId → 建立 ChatService
 _handleUserMessage() 顯示使用者訊息 → showThinking() → sendMessage()
 onMessage 路由:
-  STREAM_CHUNK → chatUI.appendToStreamBubble(content)
-  STREAM_END   → chatUI.finishStreamBubble(sources)
-  其他         → eventBus.emit('incoming', content)
+  STREAM_CHUNK     → chatUI.appendToStreamBubble(content)
+  STREAM_END       → chatUI.finishStreamBubble(sources)
+  PROCESSING_START → chatUI.showProcessing()
+  QUEUE_UPDATE     → chatUI.updateQueuePosition(pos)
 ```
 
 #### `ChatUI`
-純 DOM 操作，無狀態。
+純 DOM 操作。
 
 ```javascript
-showOutgoing(message)          顯示使用者訊息 bubble
-showIncoming(message)          顯示機器人訊息 bubble（取代 Thinking...）
-showThinking()                 顯示 "Thinking..." placeholder
-appendToStreamBubble(chunk)    串流：第一個 chunk 取代 Thinking...，後續累加
-finishStreamBubble(sources)    串流結束：移除 data-streaming，附加參考資料
-_appendSources(li, sources)    渲染 .sources-container 參考資料標籤
+showThinking()                 顯示 "排隊中..." 並鎖定輸入
+updateQueuePosition(pos)       更新排隊人次，顯示 "重新整理" 按鈕 (1min cooldown)
+showProcessing()               顯示 "系統處理中..."
+appendToStreamBubble(chunk)    串流顯示 token
+finishStreamBubble(sources)    串流結束，渲染 Markdown 並附上參考資料
 ```
 
 #### `ChatService`

@@ -40,6 +40,7 @@ public class ChatRedisService {
 	private static final String QUEUE_WAITING = "queue:waiting";// ZSet 儲存等待排序
 	private static final String ONLINE_AGENTS = "online:agents";// Set 儲存在線客服 ID
 	private static final String BIND_PREFIX = "bind:user:";// 綁定該使用者給哪位客服
+	private static final String ACTIVE_REQUEST_PREFIX = "chat:active:"; // 儲存活躍請求的 key
 
 	// ----- 每個聊天的 Session -----
 
@@ -151,5 +152,30 @@ public class ChatRedisService {
 
 	public Set<String> getOnlineAgents() {
 		return redisTemplate.opsForSet().members(ONLINE_AGENTS);
+	}
+
+	// ----- 冪等性與鎖 -----
+
+	/**
+	 * 嘗試獲取請求鎖，成功則回傳 true，代表可以進行提問
+	 */
+	public boolean acquireRequestLock(String sessionId) {
+		String key = ACTIVE_REQUEST_PREFIX + sessionId;
+		// 設置 10 分鐘過期，防止意外死鎖
+		return Boolean.TRUE.equals(redisTemplate.opsForValue().setIfAbsent(key, "processing", Duration.ofMinutes(10)));
+	}
+
+	/**
+	 * 釋放請求鎖
+	 */
+	public void releaseRequestLock(String sessionId) {
+		redisTemplate.delete(ACTIVE_REQUEST_PREFIX + sessionId);
+	}
+
+	/**
+	 * 檢查是否正在處理中
+	 */
+	public boolean isRequestProcessing(String sessionId) {
+		return Boolean.TRUE.equals(redisTemplate.hasKey(ACTIVE_REQUEST_PREFIX + sessionId));
 	}
 }

@@ -32,7 +32,6 @@ export class ChatApp {
     this._disconnected = false;
     this._suggestionsLoaded = false;
     this._suggestFetchedAt = 0;
-    this._queuePollTimer = null;
 
     this._bindEvents();
     this._initSession();
@@ -88,7 +87,6 @@ export class ChatApp {
         this._stopQueuePolling();
         this.chatUI.appendToStreamBubble(msg.payload?.content || '');
       } else if (msg.type === 'STREAM_END') {
-        this._stopQueuePolling();
         this.chatUI.finishStreamBubble(msg.payload?.sources);
       } else {
         this.eventBus.emit('incoming', msg.payload?.content || '');
@@ -143,7 +141,6 @@ export class ChatApp {
     this.chatUI.showOutgoing(message);
     this.chatUI.showThinking();
     this.chatService.sendMessage({ type: 'message', content: message });
-    this._startQueuePolling();
   }
 
   _handleEndConversation() {
@@ -209,6 +206,7 @@ export class ChatApp {
     }
   }
 
+
   // ── Queue position polling ──────────────────────────────────
 
   _startQueuePolling() {
@@ -241,7 +239,6 @@ export class ChatApp {
   destroy() {
     clearTimeout(this._idleTimer);
     clearTimeout(this._idleSuggestTimer);
-    this._stopQueuePolling();
     this._disconnect();
   }
 

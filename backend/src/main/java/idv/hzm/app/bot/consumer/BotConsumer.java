@@ -27,11 +27,13 @@ import idv.hzm.app.bot.config.SseRedisSubscriber;
 import idv.hzm.app.bot.dto.EventDto;
 import idv.hzm.app.bot.dto.MessagePayload;
 import idv.hzm.app.bot.service.ChatHistoryService;
+import idv.hzm.app.bot.service.ChatRedisService;
 
 @Component
 public class BotConsumer implements StreamListener<String, MapRecord<String, String, String>> {
 
 	private static final Logger logger = LoggerFactory.getLogger(BotConsumer.class);
+	private static final String INSTANCE_ID = java.util.UUID.randomUUID().toString().substring(0, 8);
 
 	@Autowired
 	private AnythingLLMClient anythingLLMClient;
@@ -53,6 +55,9 @@ public class BotConsumer implements StreamListener<String, MapRecord<String, Str
 
 	@Autowired
 	private RedisStreamConfig redisStreamConfig;
+
+	@Autowired
+	private ChatRedisService chatRedisService;
 
 	@PostConstruct
 	public void subscribe() {
@@ -86,7 +91,8 @@ public class BotConsumer implements StreamListener<String, MapRecord<String, Str
 
 		int count = redisStreamConfig.getConsumerCount();
 		for (int i = 1; i <= count; i++) {
-			streamMessageListenerContainer.receive(Consumer.from(RedisStreamConfig.CONSUMER_GROUP, "bot-consumer-" + i),
+			String consumerName = "bot-consumer-" + INSTANCE_ID + "-" + i;
+			streamMessageListenerContainer.receive(Consumer.from(RedisStreamConfig.CONSUMER_GROUP, consumerName),
 					StreamOffset.create(RedisStreamConfig.BOT_INCOMING_STREAM, ReadOffset.lastConsumed()), this);
 		}
 		logger.info("[TRACE-1] Subscribed {} consumers to stream: {}", count,
@@ -161,6 +167,8 @@ public class BotConsumer implements StreamListener<String, MapRecord<String, Str
 		} catch (Exception e) {
 			logger.error("Error processing stream message for sessionId {}: {}", sessionId, e.getMessage(), e);
 		} finally {
+			// 處理完畢（不論成功失敗）釋放鎖
+			chatRedisService.releaseRequestLock(sessionId);
 			redisTemplate.opsForStream().acknowledge(RedisStreamConfig.CONSUMER_GROUP, record);
 		}
 	}

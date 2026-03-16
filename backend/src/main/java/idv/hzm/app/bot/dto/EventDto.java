@@ -11,6 +11,7 @@ public class EventDto {
 	public static final String TYPE_STREAM_CHUNK = "STREAM_CHUNK";
 	public static final String TYPE_STREAM_END = "STREAM_END";
 	public static final String TYPE_PROCESSING_START = "PROCESSING_START";
+	public static final String TYPE_QUEUE_UPDATE = "QUEUE_UPDATE";
 
 	private String sessionId;
 	private String type = TYPE_MESSAGE;
