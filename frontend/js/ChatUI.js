@@ -363,12 +363,31 @@ export class ChatUI {
       this._streamTimer = null;
       return;
     }
-    const ch = this._streamQueue.shift();
+
+    // Dynamic speed adjustment based on queue backlog
+    let delay = this._streamSpeed;
+    let charsPerTick = 1;
+
+    if (this._streamQueue.length > 150) {
+      delay = 0;
+      charsPerTick = 3; // Turbo mode: process multiple chars per tick
+    } else if (this._streamQueue.length > 50) {
+      delay = Math.min(5, this._streamSpeed);
+    }
+
+    for (let i = 0; i < charsPerTick; i++) {
+      if (this._streamQueue.length === 0) break;
+      const ch = this._streamQueue.shift();
+      if (this._streamTarget) {
+        this._streamTarget.textContent += ch;
+      }
+    }
+
     if (this._streamTarget) {
-      this._streamTarget.textContent += ch;
       this.chatbox.scrollTop = this.chatbox.scrollHeight;
     }
-    this._streamTimer = setTimeout(() => this._drainQueue(), this._streamSpeed);
+
+    this._streamTimer = setTimeout(() => this._drainQueue(), delay);
   }
 
   /** Stop current streaming/thinking: flush queue, remove markers */
@@ -433,6 +452,11 @@ export class ChatUI {
   }
 
   _appendSources(li, sources) {
+    if (!sources || sources.length === 0) return;
+
+    // 防止重複添加 (在重新連線或重播串流時很有用)
+    if (li.querySelector('.sources-container')) return;
+
     const container = document.createElement('div');
     container.className = 'sources-container';
 
@@ -442,10 +466,14 @@ export class ChatUI {
     container.appendChild(label);
 
     sources.forEach(source => {
-      const title = source.title || source.url || '文件';
+      // 資料結構分析：優先順序 Title > Document Name > URL 檔名
+      const title = source.title || source.sourceDocument || (source.url ? source.url.split('/').pop() : '參考文件');
+
       const tag = document.createElement('a');
       tag.className = 'source-tag';
-      tag.textContent = title;
+      // 加上一個 Material Icon 增加質感
+      tag.innerHTML = `<span class="material-symbols-outlined" style="font-size:14px; margin-right:4px; vertical-align: middle;">description</span>${title}`;
+
       if (source.url) {
         tag.href = source.url;
         tag.target = '_blank';
@@ -454,18 +482,28 @@ export class ChatUI {
       container.appendChild(tag);
     });
 
-    // Wrap message body and sources in a bubble-wrap so they appear as one bubble
+    // --- 關鍵修復：將生成的內容掛載到 DOM ---
+
+    // 尋找訊息氣泡內的包裹層，確保「文字」與「來源標籤」被包在同一個氣泡框內
     const msgEl = li.querySelector('.msg-body') || li.querySelector('p');
-    if (msgEl) {
-      const wrap = document.createElement('div');
+    let wrap = li.querySelector('.bubble-wrap');
+
+    if (wrap) {
+      // 如果已經有 wrap (通常是 thinking 轉過來的)，直接塞進去
+      wrap.appendChild(container);
+    } else if (msgEl) {
+      // 如果沒有 wrap，建立一個並將 msgBody 與 container 一起包起來
+      wrap = document.createElement('div');
       wrap.className = 'bubble-wrap';
       msgEl.parentNode.insertBefore(wrap, msgEl);
       wrap.appendChild(msgEl);
       wrap.appendChild(container);
     } else {
+      // 萬一找不到任何內容容器，直接強行塞入 li
       li.appendChild(container);
     }
 
+    // 更新滾動條
     requestAnimationFrame(() => this.chatbox.scrollTop = this.chatbox.scrollHeight);
   }
 

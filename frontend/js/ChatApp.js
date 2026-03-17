@@ -87,7 +87,14 @@ export class ChatApp {
         this._stopQueuePolling();
         this.chatUI.appendToStreamBubble(msg.payload?.content || '');
       } else if (msg.type === 'STREAM_END') {
-        this.chatUI.finishStreamBubble(msg.payload?.sources);
+        const sources = msg.payload?.sources;
+        // 關鍵修正：忽略空的 END
+        if (!sources || sources.length === 0) {
+          console.warn('[ChatApp] Ignore empty STREAM_END');
+          return;
+        }
+
+        this.chatUI.finishStreamBubble(sources);
       } else {
         this.eventBus.emit('incoming', msg.payload?.content || '');
       }

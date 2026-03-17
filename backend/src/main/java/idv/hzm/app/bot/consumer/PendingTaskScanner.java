@@ -33,38 +33,43 @@ public class PendingTaskScanner {
                 .pending(RedisStreamConfig.BOT_INCOMING_STREAM, RedisStreamConfig.CONSUMER_GROUP)
                 .flatMapMany(summary -> {
                     long totalPending = summary.getTotalPendingMessages();
-                    if (totalPending == 0) return Flux.<PendingMessage>empty();
-                    
+                    if (totalPending == 0)
+                        return Flux.<PendingMessage>empty();
+
                     logger.info("[RECOVERY] Found {} pending messages", totalPending);
                     // 取得詳細的待處理訊息清單
                     return reactiveRedisTemplate.opsForStream()
-                            .pending(RedisStreamConfig.BOT_INCOMING_STREAM, RedisStreamConfig.CONSUMER_GROUP, org.springframework.data.domain.Range.unbounded(), 100);
+                            .pending(RedisStreamConfig.BOT_INCOMING_STREAM, RedisStreamConfig.CONSUMER_GROUP,
+                                    org.springframework.data.domain.Range.unbounded(), 100)
+                            .flatMapMany(Flux::fromIterable);
                 })
-                .cast(PendingMessage.class)
                 .filter(pendingMessage -> {
                     Duration idle = pendingMessage.getElapsedTimeSinceLastDelivery();
                     return idle != null && idle.compareTo(MIN_IDLE_TIME) > 0;
                 })
                 .flatMap(this::claimMessage)
                 .subscribe(
-                    claimedId -> logger.info("[RECOVERY] Successfully claimed message ID: {}", claimedId),
-                    error -> logger.error("[RECOVERY] Error during pending task scan: {}", error.getMessage())
-                );
+                        claimedId -> logger.info("[RECOVERY] Successfully claimed message ID: {}", claimedId),
+                        error -> logger.error("[RECOVERY] Error during pending task scan: {}: {}", error.getClass().getSimpleName(), error.getMessage()));
     }
 
     private Mono<String> claimMessage(PendingMessage pendingMessage) {
-        logger.warn("[RECOVERY] Claiming timed-out message: ID={}, IdleTime={}", 
+        logger.warn("[RECOVERY] Claiming timed-out message: ID={}, IdleTime={}",
                 pendingMessage.getIdAsString(), pendingMessage.getElapsedTimeSinceLastDelivery());
 
         // 使用 XCLAIM 將訊息轉發給 recovery-consumer 重新觸發 BotConsumer 的處理流程
         // 注意：這裡簡單地重新分配，BotConsumer 的不同實例會再次收到此訊息（因為分配給了群組中的一個名稱）
         return reactiveRedisTemplate.opsForStream()
-                .claim(RedisStreamConfig.BOT_INCOMING_STREAM, 
-                       RedisStreamConfig.CONSUMER_GROUP, 
-                       RECOVERY_CONSUMER, 
-                       MIN_IDLE_TIME, 
-                       pendingMessage.getId())
+                .claim(RedisStreamConfig.BOT_INCOMING_STREAM,
+                        RedisStreamConfig.CONSUMER_GROUP,
+                        RECOVERY_CONSUMER,
+                        MIN_IDLE_TIME,
+                        pendingMessage.getId())
                 .next()
-                .map(record -> record.getId().getValue());
+                .map(record -> record.getId().getValue())
+                .doOnNext(id -> logger.info("[RECOVERY] Message {} claimed by {}", id, RECOVERY_CONSUMER))
+                .switchIfEmpty(Mono.fromRunnable(() -> 
+                    logger.debug("[RECOVERY] Message {} could not be claimed (already processed or missing)", pendingMessage.getIdAsString())
+                ).then(Mono.empty()));
     }
 }
