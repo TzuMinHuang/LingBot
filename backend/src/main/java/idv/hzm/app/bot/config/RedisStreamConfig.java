@@ -25,32 +25,7 @@ public class RedisStreamConfig {
 	@Value("${app.consumer-count:8}")
 	private int consumerCount;
 
-	private ExecutorService streamExecutor;
-
 	public int getConsumerCount() {
 		return consumerCount;
-	}
-
-	@Bean
-	StreamMessageListenerContainer<String, MapRecord<String, String, String>> streamMessageListenerContainer(
-			RedisConnectionFactory factory) {
-
-		streamExecutor = Executors.newFixedThreadPool(consumerCount);
-
-		StreamMessageListenerContainerOptions<String, MapRecord<String, String, String>> options = StreamMessageListenerContainerOptions
-				.builder().pollTimeout(Duration.ofMillis(200)).executor(streamExecutor)
-				.build();
-
-		StreamMessageListenerContainer<String, MapRecord<String, String, String>> container = StreamMessageListenerContainer
-				.create(factory, options);
-		container.start();
-		return container;
-	}
-
-	@PreDestroy
-	public void shutdown() {
-		if (streamExecutor != null) {
-			streamExecutor.shutdown();
-		}
 	}
 }

@@ -14,6 +14,7 @@ public class EventDto {
 	public static final String TYPE_QUEUE_UPDATE = "QUEUE_UPDATE";
 
 	private String sessionId;
+	private String interactionId;
 	private String type = TYPE_MESSAGE;
 	private BasePayload payload; // 使用 Jackson 的 JsonNode 來對應 JSONB 欄位
 
@@ -23,6 +24,14 @@ public class EventDto {
 
 	public void setSessionId(String sessionId) {
 		this.sessionId = sessionId;
+	}
+
+	public String getInteractionId() {
+		return interactionId;
+	}
+
+	public void setInteractionId(String interactionId) {
+		this.interactionId = interactionId;
 	}
 
 	public String getType() {

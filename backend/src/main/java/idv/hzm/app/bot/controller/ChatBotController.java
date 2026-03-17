@@ -8,18 +8,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.connection.stream.StreamRecords;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.codec.ServerSentEvent;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.data.redis.core.ReactiveRedisTemplate;
+
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
 import idv.hzm.app.bot.config.RedisStreamConfig;
 import idv.hzm.app.bot.config.SseEmitterManager;
+import idv.hzm.app.bot.dto.EventDto;
 import idv.hzm.app.bot.dto.InitialClientInfo;
 import idv.hzm.app.bot.service.ChatHistoryService;
 import idv.hzm.app.bot.service.ChatRedisService;
@@ -42,9 +45,6 @@ public class ChatBotController {
 	private SseEmitterManager sseEmitterManager;
 
 	@Autowired
-	private StringRedisTemplate redisTemplate;
-
-	@Autowired
 	private SuggestionService suggestionService;
 
 	@Autowired
@@ -56,6 +56,9 @@ public class ChatBotController {
 	@Autowired
 	private RedisStreamConfig redisStreamConfig;
 
+	@Autowired
+	private ReactiveRedisTemplate<String, String> reactiveRedisTemplate;
+
 	@PostMapping("/chat/initial")
 	public InitialClientInfo initialClientInfo() {
 		return this.chatSessionService.initialClientInfo();
@@ -64,46 +67,56 @@ public class ChatBotController {
 	/**
 	 * SSE 訂閱 — 前端連線後持續接收事件
 	 */
-	@GetMapping("/chat/{sessionId}/stream")
-	public SseEmitter stream(@PathVariable String sessionId) {
+	@GetMapping(value = "/chat/{sessionId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+	public Flux<ServerSentEvent<EventDto>> stream(@PathVariable String sessionId) {
 		if (!isValidSessionId(sessionId)) {
-			throw new org.springframework.web.server.ResponseStatusException(
-					org.springframework.http.HttpStatus.BAD_REQUEST, "invalid sessionId");
+			return Flux.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid sessionId"));
 		}
 		if (!chatRedisService.isSessionActive(sessionId)) {
-			throw new org.springframework.web.server.ResponseStatusException(
-					org.springframework.http.HttpStatus.BAD_REQUEST, "session not found or expired");
+			return Flux.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "session not found or expired"));
 		}
-		logger.info("[SSE] Client connected: sessionId={}", sessionId);
-		return sseEmitterManager.create(sessionId);
+		
+		logger.info("[RE-SSE] Client connected: sessionId={}", sessionId);
+
+		// Mode B: 從 Redis Stream 讀取歷史 (尚待實作：取得 Offset)
+		// Flux<EventDto> history = reactiveRedisTemplate.opsForStream().read(...)
+
+		// Mode A: 訂閱實時 Pub/Sub 轉發
+		return sseEmitterManager.subscribe(sessionId)
+				.map(event -> ServerSentEvent.<EventDto>builder()
+						.id(event.getInteractionId())
+						.event("chat")
+						.data(event)
+						.build())
+				.doOnTerminate(() -> logger.info("[RE-SSE] Stream terminated: sessionId={}", sessionId));
 	}
 
 	/**
 	 * 發送訊息 — 取代 STOMP @MessageMapping
 	 */
 	@PostMapping("/chat/{sessionId}/send")
-	public ResponseEntity<?> send(@PathVariable String sessionId, @RequestBody Map<String, String> body) {
+	public Mono<ResponseEntity<?>> send(@PathVariable String sessionId, @RequestBody Map<String, String> body) {
 		if (!isValidSessionId(sessionId)) {
-			return ResponseEntity.badRequest().body("invalid sessionId");
+			return Mono.just(ResponseEntity.badRequest().body("invalid sessionId"));
 		}
 		if (!chatRedisService.isSessionActive(sessionId)) {
-			return ResponseEntity.badRequest().body("session not found or expired");
+			return Mono.just(ResponseEntity.badRequest().body("session not found or expired"));
 		}
 
 		String content = body.get("content");
 		if (content == null || content.isBlank()) {
-			return ResponseEntity.badRequest().body("content is required");
+			return Mono.just(ResponseEntity.badRequest().body("content is required"));
 		}
 		if (content.length() > maxInputLength) {
 			logger.warn("Message from session {} exceeds max length ({}), rejected", sessionId, content.length());
-			return ResponseEntity.badRequest().body("content exceeds max length");
+			return Mono.just(ResponseEntity.badRequest().body("content exceeds max length"));
 		}
 
 		// 冪等性檢查：同一時間只能提問一次
 		if (!chatRedisService.acquireRequestLock(sessionId)) {
 			logger.warn("Concurrent message from session {}, rejected", sessionId);
-			return ResponseEntity.status(org.springframework.http.HttpStatus.TOO_MANY_REQUESTS)
-					.body("Another request is in progress. Please wait.");
+			return Mono.just(ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+					.body("Another request is in progress. Please wait."));
 		}
 
 		try {
@@ -117,13 +130,19 @@ public class ChatBotController {
 					"sessionId", sessionId,
 					"content", content,
 					"interactionId", interactionId);
-			redisTemplate.opsForStream()
-					.add(StreamRecords.mapBacked(record).withStreamKey(RedisStreamConfig.BOT_INCOMING_STREAM));
-			return ResponseEntity.ok().build();
+			
+			return reactiveRedisTemplate.opsForStream()
+					.add(idv.hzm.app.bot.config.RedisStreamConfig.BOT_INCOMING_STREAM, record)
+					.map(id -> ResponseEntity.ok().build())
+					.onErrorResume(e -> {
+						logger.error("Failed to enqueue message to Redis Stream: {}", e.getMessage());
+						chatRedisService.releaseRequestLock(sessionId);
+						return Mono.just(ResponseEntity.internalServerError().body("failed to enqueue message"));
+					});
 		} catch (Exception e) {
-			logger.error("Failed to enqueue message to Redis Stream: {}", e.getMessage());
+			logger.error("Failed to process incoming message: {}", e.getMessage());
 			chatRedisService.releaseRequestLock(sessionId);
-			return ResponseEntity.internalServerError().body("failed to enqueue message");
+			return Mono.just(ResponseEntity.internalServerError().body("failed to process message"));
 		}
 	}
 
@@ -131,44 +150,61 @@ public class ChatBotController {
 	 * 手動取消目前的提問（釋放鎖）
 	 */
 	@PostMapping("/chat/{sessionId}/stop")
-	public ResponseEntity<?> stop(@PathVariable String sessionId) {
+	public Mono<ResponseEntity<?>> stop(@PathVariable String sessionId) {
 		if (!isValidSessionId(sessionId)) {
-			return ResponseEntity.badRequest().body("invalid sessionId");
+			return Mono.just(ResponseEntity.badRequest().body("invalid sessionId"));
 		}
 		chatRedisService.releaseRequestLock(sessionId);
 		logger.info("[STOP] Released lock for sessionId: {}", sessionId);
-		return ResponseEntity.ok().build();
+		return Mono.just(ResponseEntity.ok().build());
 	}
 
 	/**
 	 * 取得對話歷史紀錄
 	 */
 	@GetMapping("/chat/{sessionId}/history")
-	public ResponseEntity<?> history(@PathVariable String sessionId) {
+	public Mono<ResponseEntity<?>> history(@PathVariable String sessionId) {
 		if (!isValidSessionId(sessionId)) {
-			return ResponseEntity.badRequest().body("invalid sessionId");
+			return Mono.just(ResponseEntity.badRequest().body("invalid sessionId"));
 		}
 		Map<String, Object> result = chatHistoryService.getSessionHistory(sessionId);
 		if (result.get("userId") == null) {
-			return ResponseEntity.notFound().build();
+			return Mono.just(ResponseEntity.notFound().build());
 		}
-		return ResponseEntity.ok(result);
+		return Mono.just(ResponseEntity.ok(result));
 	}
 
 	/**
 	 * 查詢排隊位置 — 近似值 = stream 長度 - consumer 數量
 	 */
 	@GetMapping("/chat/{sessionId}/queue-position")
-	public ResponseEntity<?> queuePosition(@PathVariable String sessionId) {
+	public Mono<ResponseEntity<?>> queuePosition(@PathVariable String sessionId) {
 		if (!isValidSessionId(sessionId)) {
-			return ResponseEntity.badRequest().body("invalid sessionId");
+			return Mono.just(ResponseEntity.badRequest().body("invalid sessionId"));
 		}
-		Long len = redisTemplate.opsForStream()
-				.size(RedisStreamConfig.BOT_INCOMING_STREAM);
-		long streamLen = len != null ? len : 0L;
-		int consumers = redisStreamConfig.getConsumerCount();
-		int position = Math.max(0, (int) (streamLen - consumers));
-		return ResponseEntity.ok(Map.of("position", position));
+		
+		return reactiveRedisTemplate.execute(conn -> conn.streamCommands()
+				.xInfoGroups(idv.hzm.app.bot.config.RedisStreamConfig.BOT_INCOMING_STREAM.getBytes()))
+				.filter(groupObj -> {
+					Map<byte[], byte[]> info = (Map<byte[], byte[]>) groupObj;
+					String name = new String(info.get("name".getBytes()));
+					return idv.hzm.app.bot.config.RedisStreamConfig.CONSUMER_GROUP.equals(name);
+				})
+				.next()
+				.map(groupObj -> {
+					Map<byte[], byte[]> info = (Map<byte[], byte[]>) groupObj;
+					byte[] lagBytes = info.get("lag".getBytes());
+					int position = 0;
+					if (lagBytes != null) {
+						position = Integer.parseInt(new String(lagBytes));
+					}
+					return ResponseEntity.ok(Map.of("position", position));
+				})
+				.defaultIfEmpty(ResponseEntity.ok(Map.of("position", 0)))
+				.onErrorResume(e -> {
+					logger.warn("Failed to get queue position via XINFO: {}", e.getMessage());
+					return Mono.just(ResponseEntity.ok(Map.of("position", 0)));
+				});
 	}
 
 	private boolean isValidSessionId(String sessionId) {
@@ -179,8 +215,8 @@ public class ChatBotController {
 	 * 取得常見問題 — 依詢問頻率排序
 	 */
 	@GetMapping("/chat/suggestions")
-	public Map<String, List<String>> suggestions(@RequestParam(defaultValue = "10") int limit) {
-		List<String> items = suggestionService.getTopSuggestions(limit);
-		return Map.of("suggestions", items);
+	public Mono<Map<String, List<String>>> suggestions(@RequestParam(defaultValue = "10") int limit) {
+		return Mono.fromCallable(() -> suggestionService.getTopSuggestions(limit))
+				.map(items -> Map.of("suggestions", items));
 	}
 }

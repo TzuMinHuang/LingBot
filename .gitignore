@@ -1,11 +1,72 @@
+# Environment
 .env
-bot/rasa-bot/.config/*
-bot/rasa-bot/.rasa/*
-bot/rasa-bot/models/*
-bot/rasa-bot/rasa-env/*
-/.metadata/
-data/
-backend/backup/*
-backend/target/*    
-stress-test/venv/* 
 
+# Logs
+*.log
+logs/
+
+# Java / Maven
+target/
+**/target/
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Node / Frontend
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+.npm
+.eslintcache
+.stylelintcache
+
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+**/venv/
+.env/
+.venv/
+**/env/
+**/venv/
+build/
+develop-eggs/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDEs / Editors
+.metadata/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# AI Assistant / Agent Metadata
+.agent/
+.antigravity/
+.claude/
+.gemini/
+
+# Project Specific
+data/
+backend/backup/
+/everythingllm/storage/
