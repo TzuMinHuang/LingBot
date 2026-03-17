@@ -193,7 +193,7 @@ public class BotConsumer {
 					.add(streamKey, record)
 					.flatMap(id -> {
 						// 修剪 Session Stream，避免過長 (例如只留最後 50 筆)
-						return reactiveRedisTemplate.opsForStream().trim(streamKey, 50).thenReturn(id);
+						return reactiveRedisTemplate.opsForStream().trim(streamKey, 50).thenReturn(id.getValue());
 					});
 			
 			return Mono.zip(pubSub, sessionStream)

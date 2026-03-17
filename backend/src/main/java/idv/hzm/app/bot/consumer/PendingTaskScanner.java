@@ -33,14 +33,18 @@ public class PendingTaskScanner {
                 .pending(RedisStreamConfig.BOT_INCOMING_STREAM, RedisStreamConfig.CONSUMER_GROUP)
                 .flatMapMany(summary -> {
                     long totalPending = summary.getTotalPendingMessages();
-                    if (totalPending == 0) return Flux.empty();
+                    if (totalPending == 0) return Flux.<PendingMessage>empty();
                     
                     logger.info("[RECOVERY] Found {} pending messages", totalPending);
                     // 取得詳細的待處理訊息清單
                     return reactiveRedisTemplate.opsForStream()
-                            .pending(RedisStreamConfig.BOT_INCOMING_STREAM, Consumer.from(RedisStreamConfig.CONSUMER_GROUP, summary.getConsumerNames().keySet().iterator().next()), summary.getRange(), 100);
+                            .pending(RedisStreamConfig.BOT_INCOMING_STREAM, RedisStreamConfig.CONSUMER_GROUP, org.springframework.data.domain.Range.unbounded(), 100);
                 })
-                .filter(pendingMessage -> pendingMessage.getElapsedTimeSinceLastDelivery().compareTo(MIN_IDLE_TIME) > 0)
+                .cast(PendingMessage.class)
+                .filter(pendingMessage -> {
+                    Duration idle = pendingMessage.getElapsedTimeSinceLastDelivery();
+                    return idle != null && idle.compareTo(MIN_IDLE_TIME) > 0;
+                })
                 .flatMap(this::claimMessage)
                 .subscribe(
                     claimedId -> logger.info("[RECOVERY] Successfully claimed message ID: {}", claimedId),
@@ -60,6 +64,7 @@ public class PendingTaskScanner {
                        RECOVERY_CONSUMER, 
                        MIN_IDLE_TIME, 
                        pendingMessage.getId())
+                .next()
                 .map(record -> record.getId().getValue());
     }
 }

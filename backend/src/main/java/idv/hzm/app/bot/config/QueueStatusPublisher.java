@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import idv.hzm.app.bot.config.SseEmitterManager;
 import idv.hzm.app.bot.dto.EventDto;
 import idv.hzm.app.bot.dto.QueuePayload;
 

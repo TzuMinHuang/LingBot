@@ -1,3 +1,5 @@
+package idv.hzm.app.bot.config;
+
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 

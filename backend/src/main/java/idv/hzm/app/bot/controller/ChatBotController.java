@@ -1,5 +1,6 @@
 package idv.hzm.app.bot.controller;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -8,11 +9,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.codec.ServerSentEvent;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
@@ -24,6 +24,7 @@ import idv.hzm.app.bot.config.RedisStreamConfig;
 import idv.hzm.app.bot.config.SseEmitterManager;
 import idv.hzm.app.bot.dto.EventDto;
 import idv.hzm.app.bot.dto.InitialClientInfo;
+import idv.hzm.app.bot.dto.QueuePayload;
 import idv.hzm.app.bot.service.ChatHistoryService;
 import idv.hzm.app.bot.service.ChatRedisService;
 import idv.hzm.app.bot.service.ChatSessionService;
@@ -95,28 +96,29 @@ public class ChatBotController {
 	 * 發送訊息 — 取代 STOMP @MessageMapping
 	 */
 	@PostMapping("/chat/{sessionId}/send")
-	public Mono<ResponseEntity<?>> send(@PathVariable String sessionId, @RequestBody Map<String, String> body) {
+	public Mono<ResponseEntity<Object>> send(
+			@PathVariable String sessionId,
+			@RequestBody Map<String, String> body) {
 		if (!isValidSessionId(sessionId)) {
-			return Mono.just(ResponseEntity.badRequest().body("invalid sessionId"));
+			return Mono.just(ResponseEntity.badRequest().body((Object) "invalid sessionId"));
 		}
 		if (!chatRedisService.isSessionActive(sessionId)) {
-			return Mono.just(ResponseEntity.badRequest().body("session not found or expired"));
+			return Mono.just(ResponseEntity.badRequest().body((Object) "session not found or expired"));
 		}
 
 		String content = body.get("content");
 		if (content == null || content.isBlank()) {
-			return Mono.just(ResponseEntity.badRequest().body("content is required"));
+			return Mono.just(ResponseEntity.badRequest().body((Object) "content is required"));
 		}
 		if (content.length() > maxInputLength) {
 			logger.warn("Message from session {} exceeds max length ({}), rejected", sessionId, content.length());
-			return Mono.just(ResponseEntity.badRequest().body("content exceeds max length"));
+			return Mono.just(ResponseEntity.badRequest().body((Object) "content exceeds max length"));
 		}
 
 		// 冪等性檢查：同一時間只能提問一次
 		if (!chatRedisService.acquireRequestLock(sessionId)) {
 			logger.warn("Concurrent message from session {}, rejected", sessionId);
-			return Mono.just(ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-					.body("Another request is in progress. Please wait."));
+			return Mono.just(ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build());
 		}
 
 		try {
@@ -130,19 +132,20 @@ public class ChatBotController {
 					"sessionId", sessionId,
 					"content", content,
 					"interactionId", interactionId);
-			
-			return reactiveRedisTemplate.opsForStream()
-					.add(idv.hzm.app.bot.config.RedisStreamConfig.BOT_INCOMING_STREAM, record)
-					.map(id -> ResponseEntity.ok().build())
-					.onErrorResume(e -> {
-						logger.error("Failed to enqueue message to Redis Stream: {}", e.getMessage());
-						chatRedisService.releaseRequestLock(sessionId);
-						return Mono.just(ResponseEntity.internalServerError().body("failed to enqueue message"));
+
+			return chatRedisService.checkIdempotency(interactionId)
+					.flatMap(active -> {
+						if (Boolean.TRUE.equals(active)) {
+							return Mono.just(ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build());
+						}
+						
+						return chatRedisService.enqueueRequest(sessionId, record)
+								.map(msgId -> ResponseEntity.ok((Object) Map.of("interactionId", interactionId)));
 					});
 		} catch (Exception e) {
 			logger.error("Failed to process incoming message: {}", e.getMessage());
 			chatRedisService.releaseRequestLock(sessionId);
-			return Mono.just(ResponseEntity.internalServerError().body("failed to process message"));
+			return Mono.just(ResponseEntity.internalServerError().body((Object) "failed to process message"));
 		}
 	}
 
@@ -171,39 +174,31 @@ public class ChatBotController {
 		if (result.get("userId") == null) {
 			return Mono.just(ResponseEntity.notFound().build());
 		}
-		return Mono.just(ResponseEntity.ok(result));
+		return Mono.just(ResponseEntity.ok((Object) result));
 	}
 
 	/**
 	 * 查詢排隊位置 — 近似值 = stream 長度 - consumer 數量
 	 */
 	@GetMapping("/chat/{sessionId}/queue-position")
-	public Mono<ResponseEntity<?>> queuePosition(@PathVariable String sessionId) {
+	public Mono<ResponseEntity<Object>> queuePosition(@PathVariable String sessionId) {
 		if (!isValidSessionId(sessionId)) {
-			return Mono.just(ResponseEntity.badRequest().body("invalid sessionId"));
+			return Mono.just(ResponseEntity.badRequest().body((Object) "invalid sessionId"));
 		}
-		
+
+		// 使用 XINFO GROUPS 獲取 lag
 		return reactiveRedisTemplate.execute(conn -> conn.streamCommands()
-				.xInfoGroups(idv.hzm.app.bot.config.RedisStreamConfig.BOT_INCOMING_STREAM.getBytes()))
-				.filter(groupObj -> {
-					Map<byte[], byte[]> info = (Map<byte[], byte[]>) groupObj;
-					String name = new String(info.get("name".getBytes()));
-					return idv.hzm.app.bot.config.RedisStreamConfig.CONSUMER_GROUP.equals(name);
-				})
+						.xInfoGroups(ByteBuffer.wrap(idv.hzm.app.bot.config.RedisStreamConfig.BOT_INCOMING_STREAM.getBytes())))
+				.filter(group -> "bot-consumer-group".equals(group.groupName()))
 				.next()
-				.map(groupObj -> {
-					Map<byte[], byte[]> info = (Map<byte[], byte[]>) groupObj;
-					byte[] lagBytes = info.get("lag".getBytes());
-					int position = 0;
-					if (lagBytes != null) {
-						position = Integer.parseInt(new String(lagBytes));
-					}
-					return ResponseEntity.ok(Map.of("position", position));
+				.map(group -> {
+					long pending = group.pendingCount() != null ? group.pendingCount() : 0;
+					return ResponseEntity.ok((Object) Map.of("position", pending));
 				})
-				.defaultIfEmpty(ResponseEntity.ok(Map.of("position", 0)))
+				.defaultIfEmpty(ResponseEntity.ok((Object) Map.of("position", 0)))
 				.onErrorResume(e -> {
 					logger.warn("Failed to get queue position via XINFO: {}", e.getMessage());
-					return Mono.just(ResponseEntity.ok(Map.of("position", 0)));
+					return Mono.just(ResponseEntity.ok((Object) Map.of("position", 0)));
 				});
 	}
 

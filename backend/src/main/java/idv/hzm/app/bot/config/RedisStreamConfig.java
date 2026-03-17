@@ -18,8 +18,7 @@ import org.springframework.data.redis.stream.StreamMessageListenerContainer.Stre
 public class RedisStreamConfig {
 
 	public static final String BOT_INCOMING_STREAM = "stream:bot:incoming";
-	public static final String BOT_EXECUTE_STREAM = "stream:bot:execute_request";
-	public static final String BOT_RESPOND_STREAM = "stream:bot:execute_respond";
+	public static final String BOT_DLQ_STREAM = "stream:bot:dlq";
 	public static final String CONSUMER_GROUP = "bot-consumer-group";
 
 	@Value("${app.consumer-count:8}")

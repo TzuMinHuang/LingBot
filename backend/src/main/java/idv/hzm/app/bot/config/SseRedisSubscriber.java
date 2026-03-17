@@ -27,17 +27,27 @@ public class SseRedisSubscriber implements CommandLineRunner {
 	@Autowired
 	private SseEmitterManager sseEmitterManager;
 
-					sseEmitterManager.send(sessionId, event);
-				}
-			} catch (IOException e) {
-				logger.error("[TRACE-5] Failed to deserialize ws-channel message: {} | raw: {}", e.getMessage(),
-						new String(message.getBody()));
-			}
-		};
-	}
+	@Autowired
+	private ObjectMapper objectMapper;
 
-	@Bean
-	public MessageListenerAdapter sseListenerAdapter(MessageListener sseMessageListener) {
-		return new MessageListenerAdapter(sseMessageListener, "onMessage");
+	@Override
+	public void run(String... args) {
+		reactiveRedisTemplate.listenToChannel("ws-channel")
+				.doOnNext(msg -> {
+					String rawJson = msg.getMessage();
+					try {
+						EventDto event = objectMapper.readValue(rawJson, EventDto.class);
+						String sessionId = event.getSessionId();
+						if (sessionId != null) {
+							sseEmitterManager.send(sessionId, event);
+						}
+					} catch (Exception e) {
+						logger.error("[RE-PUB] Failed to deserialize ws-channel message: {}", e.getMessage());
+					}
+				})
+				.doOnError(err -> logger.error("[RE-PUB] Subscription error on ws-channel", err))
+				.subscribe();
+		
+		logger.info("[RE-PUB] Subscribed to Redis channel: ws-channel");
 	}
 }

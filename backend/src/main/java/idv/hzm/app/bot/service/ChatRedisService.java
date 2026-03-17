@@ -8,9 +8,12 @@ import java.util.Objects;
 import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+
+import reactor.core.publisher.Mono;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,6 +28,8 @@ public class ChatRedisService {
 	private StringRedisTemplate redisTemplate;
 	@Autowired
 	RedisTemplate<String, Object> redisTemplateForObject;
+	@Autowired
+	private ReactiveRedisTemplate<String, String> reactiveRedisTemplate;
 
 	@Autowired
 	private ObjectMapper objectMapper; // Spring Boot 預設有載入 Jackson
@@ -173,9 +178,19 @@ public class ChatRedisService {
 	}
 
 	/**
-	 * 檢查是否正在處理中
+	 * 檢查是否正在處理中 (Reactive)
 	 */
-	public boolean isRequestProcessing(String sessionId) {
-		return Boolean.TRUE.equals(redisTemplate.hasKey(ACTIVE_REQUEST_PREFIX + sessionId));
+	public Mono<Boolean> checkIdempotency(String interactionId) {
+		String key = "chat:interaction:" + interactionId;
+		return reactiveRedisTemplate.hasKey(key);
+	}
+
+	/**
+	 * 將請求加入串流 (Reactive)
+	 */
+	public Mono<String> enqueueRequest(String sessionId, Map<String, String> record) {
+		return reactiveRedisTemplate.opsForStream()
+				.add(idv.hzm.app.bot.config.RedisStreamConfig.BOT_INCOMING_STREAM, record)
+				.map(id -> id.getValue());
 	}
 }
