@@ -24,6 +24,8 @@ dist/
 .npm
 .eslintcache
 .stylelintcache
+playwright-report/
+test-results/
 
 # Python
 __pycache__/

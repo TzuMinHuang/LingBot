@@ -9,6 +9,8 @@ module.exports = defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
+    // Fallback base URL — all E2E tests intercept network via page.route()
+    // so no running server is required. This is only used for page.goto() paths.
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
   },
