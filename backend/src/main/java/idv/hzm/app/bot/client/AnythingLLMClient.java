@@ -53,7 +53,7 @@ public class AnythingLLMClient {
 
 	/**
 	 * Streaming：呼叫 AnythingLLM /stream-chat，回傳每個解析後的 SSE 事件 Map。 close:true 的 chunk
-	 * 也會穿透，讓 BotConsumer 從中取出 sources。 error:true 的事件會被過濾掉。
+	 * 也會穿透，讓 RequestConsumer 從中取出 sources。 error:true 的事件會被過濾掉。
 	 */
 	public Flux<Map<String, Object>> chatStream(String message, String sessionId) {
 		String url = "/api/v1/workspace/" + workspaceSlug + "/stream-chat";
@@ -78,7 +78,7 @@ public class AnythingLLMClient {
 				logger.warn("AnythingLLM stream error event: {}", event.get("textResponse"));
 				return Flux.empty();
 			}
-			// close:true 穿透，讓 BotConsumer 取 sources
+			// close:true 穿透，讓 RequestConsumer 取 sources
 			return Flux.just(event);
 		} catch (Exception e) {
 			logger.error("Failed to parse SSE chunk: {} error: {}", json, e.getMessage());

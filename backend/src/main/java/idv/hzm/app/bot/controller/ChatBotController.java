@@ -21,14 +21,14 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import idv.hzm.app.bot.config.RedisStreamConfig;
-import idv.hzm.app.bot.config.SseEmitterManager;
+import idv.hzm.app.bot.config.SseSessionManager;
 import idv.hzm.app.bot.dto.EventDto;
 import idv.hzm.app.bot.dto.InitialClientInfo;
-import idv.hzm.app.bot.dto.QueuePayload;
 import idv.hzm.app.bot.service.ChatHistoryService;
 import idv.hzm.app.bot.service.ChatRedisService;
 import idv.hzm.app.bot.service.ChatSessionService;
 import idv.hzm.app.bot.service.SuggestionService;
+import idv.hzm.app.bot.service.UiEventService;
 
 @RestController
 public class ChatBotController {
@@ -43,7 +43,7 @@ public class ChatBotController {
 	private ChatSessionService chatSessionService;
 
 	@Autowired
-	private SseEmitterManager sseEmitterManager;
+	private SseSessionManager sseSessionManager;
 
 	@Autowired
 	private SuggestionService suggestionService;
@@ -55,45 +55,58 @@ public class ChatBotController {
 	private ChatRedisService chatRedisService;
 
 	@Autowired
-	private RedisStreamConfig redisStreamConfig;
-
-	@Autowired
 	private ReactiveRedisTemplate<String, String> reactiveRedisTemplate;
 
+	@Autowired
+	private UiEventService uiEventService;
+
 	@PostMapping("/chat/initial")
-	public InitialClientInfo initialClientInfo() {
-		return this.chatSessionService.initialClientInfo();
+	public InitialClientInfo initialClientInfo(
+			@RequestAttribute(name = "authenticatedUserId", required = false) String authenticatedUserId) {
+		return this.chatSessionService.initialClientInfo(authenticatedUserId);
 	}
 
 	/**
-	 * SSE 訂閱 — 前端連線後持續接收事件
+	 * SSE 訂閱 — 前端連線後持續接收事件，支援 Last-Event-ID 斷線重連
 	 */
 	@GetMapping(value = "/chat/{sessionId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-	public Flux<ServerSentEvent<EventDto>> stream(@PathVariable String sessionId) {
+	public Flux<ServerSentEvent<EventDto>> stream(
+			@PathVariable String sessionId,
+			@RequestHeader(value = "Last-Event-ID", required = false) String lastEventId) {
 		if (!isValidSessionId(sessionId)) {
 			return Flux.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid sessionId"));
 		}
 		if (!chatRedisService.isSessionActive(sessionId)) {
 			return Flux.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "session not found or expired"));
 		}
-		
-		logger.info("[RE-SSE] Client connected: sessionId={}", sessionId);
 
-		// Mode B: 從 Redis Stream 讀取歷史 (尚待實作：取得 Offset)
-		// Flux<EventDto> history = reactiveRedisTemplate.opsForStream().read(...)
+		logger.info("[SSE] Client connected: sessionId={}, lastEventId={}", sessionId, lastEventId);
 
-		// Mode A: 訂閱實時 Pub/Sub 轉發
-		return sseEmitterManager.subscribe(sessionId)
+		// 訂閱新的 SseSessionManager（BlockingQueue 模型）
+		Flux<EventDto> eventFlux = sseSessionManager.subscribe(sessionId);
+
+		// 如果有 Last-Event-ID，恢復未送達的訊息
+		if (lastEventId != null && !lastEventId.isBlank()) {
+			// 格式 "messageId:seqIndex" → DB 恢復; 否則 → Redis Stream 恢復
+			String[] parts = lastEventId.split(":", 2);
+			if (parts.length == 2 && parts[1].matches("\\d+")) {
+				sseSessionManager.recoverMissedChunksFromDb(sessionId, parts[0], Integer.parseInt(parts[1]));
+			} else {
+				sseSessionManager.recoverFromLastEventId(sessionId, lastEventId);
+			}
+		}
+
+		return eventFlux
 				.map(event -> ServerSentEvent.<EventDto>builder()
 						.id(event.getInteractionId())
 						.event("chat")
 						.data(event)
 						.build())
-				.doOnTerminate(() -> logger.info("[RE-SSE] Stream terminated: sessionId={}", sessionId));
+				.doOnTerminate(() -> logger.info("[SSE] Stream terminated: sessionId={}", sessionId));
 	}
 
 	/**
-	 * 發送訊息 — 取代 STOMP @MessageMapping
+	 * 發送訊息 — 寫入 stream:request
 	 */
 	@PostMapping("/chat/{sessionId}/send")
 	public Mono<ResponseEntity<Object>> send(
@@ -138,9 +151,10 @@ public class ChatBotController {
 						if (Boolean.TRUE.equals(active)) {
 							return Mono.just(ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build());
 						}
-						
-						return chatRedisService.enqueueRequest(sessionId, record)
-								.map(msgId -> ResponseEntity.ok((Object) Map.of("interactionId", interactionId)));
+
+						return reactiveRedisTemplate.opsForStream()
+								.add(RedisStreamConfig.REQUEST_STREAM, record)
+								.map(id -> ResponseEntity.ok((Object) Map.of("interactionId", interactionId)));
 					});
 		} catch (Exception e) {
 			logger.error("Failed to process incoming message: {}", e.getMessage());
@@ -178,7 +192,7 @@ public class ChatBotController {
 	}
 
 	/**
-	 * 查詢排隊位置 — 近似值 = stream 長度 - consumer 數量
+	 * 查詢排隊位置 — 基於 stream:request 的 pending count
 	 */
 	@GetMapping("/chat/{sessionId}/queue-position")
 	public Mono<ResponseEntity<Object>> queuePosition(@PathVariable String sessionId) {
@@ -186,10 +200,9 @@ public class ChatBotController {
 			return Mono.just(ResponseEntity.badRequest().body((Object) "invalid sessionId"));
 		}
 
-		// 使用 XINFO GROUPS 獲取 lag
 		return reactiveRedisTemplate.execute(conn -> conn.streamCommands()
-						.xInfoGroups(ByteBuffer.wrap(idv.hzm.app.bot.config.RedisStreamConfig.BOT_INCOMING_STREAM.getBytes())))
-				.filter(group -> "bot-consumer-group".equals(group.groupName()))
+						.xInfoGroups(ByteBuffer.wrap(RedisStreamConfig.REQUEST_STREAM.getBytes())))
+				.filter(group -> RedisStreamConfig.REQUEST_CONSUMER_GROUP.equals(group.groupName()))
 				.next()
 				.map(group -> {
 					long pending = group.pendingCount() != null ? group.pendingCount() : 0;
@@ -200,6 +213,44 @@ public class ChatBotController {
 					logger.warn("Failed to get queue position via XINFO: {}", e.getMessage());
 					return Mono.just(ResponseEntity.ok((Object) Map.of("position", 0)));
 				});
+	}
+
+	/**
+	 * 接收前端 UI 事件（PAUSE, CANCEL, FAQ_CLICK 等）
+	 */
+	@PostMapping("/chat/{sessionId}/events")
+	public ResponseEntity<?> postUiEvent(
+			@PathVariable String sessionId,
+			@RequestBody Map<String, String> body) {
+		if (!isValidSessionId(sessionId)) {
+			return ResponseEntity.badRequest().body("invalid sessionId");
+		}
+
+		String eventType = body.get("eventType");
+		if (eventType == null || eventType.isBlank()) {
+			return ResponseEntity.badRequest().body("eventType is required");
+		}
+
+		String payload = body.get("payload");
+		uiEventService.recordEvent(sessionId, eventType, payload);
+
+		// PAUSE/CANCEL 同時設定 Redis 控制鍵，供 RequestConsumer 檢查
+		if ("PAUSE".equals(eventType) || "CANCEL".equals(eventType)) {
+			chatRedisService.setControlSignal(sessionId, eventType);
+		}
+
+		return ResponseEntity.ok(Map.of("status", "recorded"));
+	}
+
+	/**
+	 * 取得 session 的 UI 事件歷史（供前端重建 UI 狀態）
+	 */
+	@GetMapping("/chat/{sessionId}/events")
+	public ResponseEntity<?> getUiEvents(@PathVariable String sessionId) {
+		if (!isValidSessionId(sessionId)) {
+			return ResponseEntity.badRequest().body("invalid sessionId");
+		}
+		return ResponseEntity.ok(uiEventService.getSessionEvents(sessionId));
 	}
 
 	private boolean isValidSessionId(String sessionId) {

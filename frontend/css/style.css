@@ -2,33 +2,51 @@
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
 
 /* ═══════════════════════════════════════
-   NEXCOM DESIGN TOKENS
-   Primary:  #0e8585 (NEXCOM Teal)
-   Accent:   #0fb5a3 (Bright Teal)
-   Dark:     #0a6b6b (Deep Teal)
-   Surface:  #f4f9f8 (Light panel)
+   NEXCOM DESIGN TOKENS (Oklch / HSL)
+   Primary:  NEXCOM Teal
+   Accent:   Bright Teal
+   Dark:     Deep Teal
+   Surface:  Light panel
 ═══════════════════════════════════════ */
 :root {
-  --navy: #0e8585;
-  --navy-mid: #0a6b6b;
-  --navy-light: #12a3a3;
-  --red: #0fb5a3;
-  --red-dark: #0e8585;
-  --bg-dark: #ffffff;
-  --bg-surface: #ffffff;
-  --bg-panel: #f5f5f5;
-  --bg-input: #ffffff;
-  --border-main: #e0e0e0;
-  --border-mid: #d0d0d0;
-  --text-primary: #1a1a1a;
-  --text-secondary: #5a6b66;
-  --text-muted: #999999;
-  --user-bubble: #0e8585;
-  --user-border: #0a6b6b;
-  --bot-bubble: #f0f7f6;
-  --bot-border: #d6ece9;
-  --panel-grad: linear-gradient(180deg, #f5f5f5 0%, #ffffff 100%);
-  --header-grad: linear-gradient(135deg, #0e8585 0%, #0a6b6b 100%);
+  /* ── Brand Oklch tokens ── */
+  --brand-primary: oklch(0.52 0.12 180);
+  --brand-mid: oklch(0.45 0.10 180);
+  --brand-light: oklch(0.60 0.13 178);
+  --brand-accent: oklch(0.66 0.14 172);
+  --brand-glow: oklch(0.52 0.12 180 / 0.35);
+
+  /* ── Legacy aliases (consumed by existing rules) ── */
+  --navy: var(--brand-primary);
+  --navy-mid: var(--brand-mid);
+  --navy-light: var(--brand-light);
+  --red: var(--brand-accent);
+  --red-dark: var(--brand-primary);
+
+  /* ── Surfaces ── */
+  --bg-dark: hsl(0 0% 100%);
+  --bg-surface: hsl(0 0% 100%);
+  --bg-panel: hsl(0 0% 96%);
+  --bg-input: hsl(0 0% 100%);
+
+  /* ── Borders ── */
+  --border-main: hsl(0 0% 88%);
+  --border-mid: hsl(0 0% 82%);
+
+  /* ── Text ── */
+  --text-primary: hsl(0 0% 10%);
+  --text-secondary: hsl(160 10% 40%);
+  --text-muted: hsl(0 0% 60%);
+
+  /* ── Chat bubbles ── */
+  --user-bubble: var(--brand-primary);
+  --user-border: var(--brand-mid);
+  --bot-bubble: oklch(0.96 0.02 175);
+  --bot-border: oklch(0.90 0.03 175);
+
+  /* ── Gradients ── */
+  --panel-grad: linear-gradient(180deg, hsl(0 0% 96%) 0%, hsl(0 0% 100%) 100%);
+  --header-grad: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-mid) 100%);
 }
 
 * {
@@ -70,14 +88,16 @@ body {
    HEADER
 ═══════════════════════════════════════ */
 .chatbot header {
-  background: var(--header-grad);
+  background: linear-gradient(135deg, oklch(0.52 0.12 180 / 0.85) 0%, oklch(0.45 0.10 180 / 0.90) 100%);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  backdrop-filter: blur(20px) saturate(1.4);
   padding: 0.7rem 1.1rem;
   display: flex;
   align-items: center;
   gap: 0.75rem;
   flex-shrink: 0;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid oklch(1 0 0 / 0.08);
+  box-shadow: 0 2px 16px oklch(0.2 0 0 / 0.12), inset 0 1px 0 oklch(1 0 0 / 0.1);
 }
 
 /* NEXCOM red left stripe before logo area */
@@ -94,7 +114,7 @@ body {
 .chatbot header h2 {
   color: #ffffff;
   font-family: 'Noto Sans TC', sans-serif;
-  font-size: 0.88rem;
+  font-size: clamp(0.78rem, 2.2vw, 0.92rem);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -190,7 +210,7 @@ body {
   color: var(--text-primary);
   background: var(--bot-bubble);
   border: 1px solid var(--bot-border);
-  border-radius: 0 8px 8px 8px;
+  border-radius: 4px 20px 20px 20px;
   border-left: 3px solid var(--navy-light);
 }
 
@@ -202,7 +222,7 @@ body {
 .chatbox .incoming .bubble-wrap>p,
 .chatbox .incoming .bubble-wrap .msg-body {
   max-width: 100%;
-  border-bottom-left-radius: 0;
+  border-bottom-left-radius: 4px;
   border-bottom-right-radius: 0;
   border-bottom: none;
   margin-bottom: 0;
@@ -216,7 +236,7 @@ body {
 .chatbox .outgoing p {
   background: var(--navy);
   border: 1px solid var(--navy-mid);
-  border-radius: 8px 8px 0 8px;
+  border-radius: 20px 20px 4px 20px;
   color: #ffffff;
   border-right: 3px solid var(--red);
 }
@@ -226,7 +246,7 @@ body {
 .chatbox .chat .msg-body {
   max-width: 78%;
   white-space: pre-wrap;
-  font-size: 0.88rem;
+  font-size: clamp(0.84rem, 2.4vw, 0.92rem);
   line-height: 1.65;
   padding: 0.7rem 0.95rem;
   font-family: 'Noto Sans TC', sans-serif;
@@ -380,7 +400,7 @@ body {
   border-radius: 4px;
   color: var(--text-primary);
   font-family: 'Noto Sans TC', sans-serif;
-  font-size: 0.87rem;
+  font-size: clamp(0.84rem, 2.4vw, 0.92rem);
   padding: 0.65rem 0.9rem;
   resize: none;
   outline: none;
@@ -663,7 +683,7 @@ body {
   color: var(--text-secondary);
   background: var(--bot-bubble);
   border: 1px dashed var(--bot-border);
-  border-radius: 0 8px 8px 8px;
+  border-radius: 4px 20px 20px 20px;
   border-left: 3px solid #e0a800;
 }
 
@@ -749,9 +769,40 @@ body {
    ═══════════════════════════════════════ */
 
 /* ═══════════════════════════════════════
+   CLOSE BUTTON (mobile only)
+═══════════════════════════════════════ */
+#close-chatbot-btn {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  color: oklch(1 0 0 / 0.85);
+  transition: background 0.2s, color 0.2s;
+  flex-shrink: 0;
+}
+
+#close-chatbot-btn:hover {
+  background: oklch(1 0 0 / 0.15);
+  color: #ffffff;
+}
+
+#close-chatbot-btn .material-symbols-outlined {
+  font-size: 22px;
+  display: block;
+}
+
+/* ═══════════════════════════════════════
    RESPONSIVE
 ═══════════════════════════════════════ */
 @media (max-width: 600px) {
+  #close-chatbot-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
   .chatbot header h2 {
     font-size: 0.78rem;
   }

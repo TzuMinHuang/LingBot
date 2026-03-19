@@ -34,6 +34,10 @@ public class ChatMessage {
 	@Column(name = "role", nullable = false, length = 20)
 	private MessageRole role;
 
+	@Enumerated(EnumType.STRING)
+	@Column(name = "status", length = 20)
+	private MessageStatus status;
+
 	@Column(name = "content", columnDefinition = "TEXT")
 	private String content;
 
@@ -80,6 +84,14 @@ public class ChatMessage {
 
 	public void setRole(MessageRole role) {
 		this.role = role;
+	}
+
+	public MessageStatus getStatus() {
+		return status;
+	}
+
+	public void setStatus(MessageStatus status) {
+		this.status = status;
 	}
 
 	public String getContent() {

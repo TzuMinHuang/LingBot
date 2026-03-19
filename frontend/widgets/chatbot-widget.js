@@ -110,10 +110,10 @@
       position: fixed;
       right: 24px;
       bottom: 24px;
-      width: 54px;
-      height: 54px;
-      border-radius: 6px;
-      background: linear-gradient(135deg, #0e8585 0%, #0a6b6b 100%);
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, oklch(0.52 0.12 180) 0%, oklch(0.45 0.10 180) 100%);
       color: #ffffff;
       border: none;
       cursor: pointer;
@@ -122,36 +122,42 @@
       justify-content: center;
       font-size: 22px;
       z-index: 9999;
-      transition: box-shadow 0.25s, transform 0.2s, background 0.2s;
-      box-shadow: 0 2px 12px rgba(14, 133, 133, 0.5), 0 0 0 2px rgba(15,181,163,0.2);
+      transition: box-shadow 0.3s, transform 0.2s, background 0.25s, opacity 0.25s;
+      box-shadow:
+        0 4px 16px oklch(0.52 0.12 180 / 0.4),
+        0 0 0 3px oklch(0.66 0.14 172 / 0.15),
+        inset 0 1px 0 oklch(1 0 0 / 0.12);
       font-family: 'Noto Sans TC', sans-serif;
     }
     #${CHATBOT_TOGGLE_ID}:hover {
-      background: linear-gradient(135deg, #12a3a3 0%, #0e8585 100%);
-      box-shadow: 0 4px 20px rgba(14, 133, 133, 0.6), 0 0 0 2px rgba(15,181,163,0.4);
+      background: linear-gradient(135deg, oklch(0.60 0.13 178) 0%, oklch(0.52 0.12 180) 100%);
+      box-shadow:
+        0 6px 24px oklch(0.52 0.12 180 / 0.5),
+        0 0 0 3px oklch(0.66 0.14 172 / 0.25),
+        inset 0 1px 0 oklch(1 0 0 / 0.15);
       transform: translateY(-2px);
     }
     #${CHATBOT_TOGGLE_ID}:active {
       transform: translateY(0);
     }
     #${CHATBOT_TOGGLE_ID}.open {
-      background: linear-gradient(135deg, #0a6b6b 0%, #0e8585 100%);
-      box-shadow: 0 4px 20px rgba(14, 133, 133, 0.45);
+      background: linear-gradient(135deg, oklch(0.45 0.10 180) 0%, oklch(0.52 0.12 180) 100%);
+      box-shadow: 0 4px 20px oklch(0.52 0.12 180 / 0.35);
     }
     #${CHATBOT_IFRAME_ID} {
       position: fixed;
       right: 24px;
-      bottom: 92px;
+      bottom: 100px;
       width: 420px;
       height: 610px;
       max-width: calc(100vw - 32px);
-      max-height: calc(100vh - 110px);
+      max-height: calc(100vh - 120px);
       border: none;
-      border-radius: 6px;
+      border-radius: 28px;
       box-shadow:
-        0 0 0 1px #d0d0d0,
-        0 0 60px rgba(0,0,0,0.15),
-        0 0 0 2px rgba(14,133,133,0.12);
+        0 0 0 1px oklch(0.82 0 0 / 0.5),
+        0 8px 60px oklch(0.2 0 0 / 0.18),
+        0 0 0 3px oklch(0.52 0.12 180 / 0.08);
       transform: scale(0.92) translateY(8px);
       opacity: 0;
       pointer-events: none;
@@ -168,11 +174,11 @@
     @media (max-width: 600px) {
       #${CHATBOT_IFRAME_ID} {
         right: 0;
-        bottom: 86px;
+        bottom: 0;
         width: 100vw;
-        height: calc(100dvh - 86px);
+        height: 100dvh;
         max-width: 100vw;
-        max-height: calc(100dvh - 86px);
+        max-height: 100dvh;
         border-radius: 0;
         transform-origin: bottom center;
       }
@@ -182,6 +188,10 @@
       #${CHATBOT_TOGGLE_ID} {
         right: 16px;
         bottom: 16px;
+      }
+      #${CHATBOT_TOGGLE_ID}.open {
+        opacity: 0;
+        pointer-events: none;
       }
     }
   `;

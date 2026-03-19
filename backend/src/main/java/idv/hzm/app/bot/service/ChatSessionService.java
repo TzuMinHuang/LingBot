@@ -21,11 +21,11 @@ public class ChatSessionService {
 	@Autowired
 	private ChatRedisService chatRedisService;
 
-	public InitialClientInfo initialClientInfo() {
+	public InitialClientInfo initialClientInfo(String authenticatedUserId) {
 
 		Session session = new Session();
 		session.setId(this.codeGeneratorUtil.nextSessionId());
-		session.setUserId(this.codeGeneratorUtil.nextUserCode());
+		session.setUserId(authenticatedUserId != null ? authenticatedUserId : this.codeGeneratorUtil.nextUserCode());
 		Instant now = Instant.now();
 		session.setStatus(SessionStatus.ACTIVE);
 		session.setStartTime(now);

@@ -17,6 +17,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import idv.hzm.app.bot.entity.ChatMessage;
 import idv.hzm.app.bot.entity.MessageRole;
+import idv.hzm.app.bot.entity.MessageStatus;
 import idv.hzm.app.bot.entity.Session;
 import idv.hzm.app.bot.repo.ChatMessageRepository;
 import idv.hzm.app.bot.repo.SessionsRepository;
@@ -56,17 +57,18 @@ public class ChatHistoryService {
 	}
 
 	/**
-	 * Save the complete assistant response after streaming ends.
+	 * Save the assistant response with a pre-generated messageId and status.
 	 */
-	public void saveAssistantMessage(String sessionId, String interactionId,
-			String fullContent, List<Map<String, Object>> sources) {
+	public void saveAssistantMessage(String sessionId, String interactionId, String messageId,
+			String fullContent, List<Map<String, Object>> sources, MessageStatus status) {
 
 		ChatMessage msg = new ChatMessage();
-		msg.setMessageId(UUID.randomUUID().toString());
+		msg.setMessageId(messageId != null ? messageId : UUID.randomUUID().toString());
 		msg.setSessionId(sessionId);
 		msg.setInteractionId(interactionId);
 		msg.setRole(MessageRole.ASSISTANT);
 		msg.setContent(fullContent);
+		msg.setStatus(status);
 		msg.setCreatedAt(Instant.now());
 
 		if (sources != null && !sources.isEmpty()) {

@@ -46,6 +46,7 @@ public class ChatRedisService {
 	private static final String ONLINE_AGENTS = "online:agents";// Set 儲存在線客服 ID
 	private static final String BIND_PREFIX = "bind:user:";// 綁定該使用者給哪位客服
 	private static final String ACTIVE_REQUEST_PREFIX = "chat:active:"; // 儲存活躍請求的 key
+	private static final String CONTROL_SIGNAL_PREFIX = "chat:control:"; // PAUSE/CANCEL 控制信號
 
 	// ----- 每個聊天的 Session -----
 
@@ -185,12 +186,29 @@ public class ChatRedisService {
 		return reactiveRedisTemplate.hasKey(key);
 	}
 
+	// ----- 控制信號（PAUSE/CANCEL）-----
+
+	/**
+	 * 設定控制信號，供 RequestConsumer 輪詢檢查。60 秒後自動過期。
+	 */
+	public void setControlSignal(String sessionId, String signal) {
+		redisTemplate.opsForValue().set(CONTROL_SIGNAL_PREFIX + sessionId, signal, Duration.ofSeconds(60));
+	}
+
+	/**
+	 * 讀取並刪除控制信號（原子操作，使用 GETDEL 避免 race condition）。
+	 */
+	public String consumeControlSignal(String sessionId) {
+		String key = CONTROL_SIGNAL_PREFIX + sessionId;
+		return redisTemplate.opsForValue().getAndDelete(key);
+	}
+
 	/**
 	 * 將請求加入串流 (Reactive)
 	 */
 	public Mono<String> enqueueRequest(String sessionId, Map<String, String> record) {
 		return reactiveRedisTemplate.opsForStream()
-				.add(idv.hzm.app.bot.config.RedisStreamConfig.BOT_INCOMING_STREAM, record)
+				.add(idv.hzm.app.bot.config.RedisStreamConfig.REQUEST_STREAM, record)
 				.map(id -> id.getValue());
 	}
 }

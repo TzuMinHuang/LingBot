@@ -1,0 +1,14 @@
+{
+  "name": "lingbot-frontend",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Dev dependencies for LingBot frontend testing (no build step required for production)",
+  "scripts": {
+    "test:e2e": "npx playwright test",
+    "test:e2e:headed": "npx playwright test --headed",
+    "test:e2e:ui": "npx playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2"
+  }
+}
